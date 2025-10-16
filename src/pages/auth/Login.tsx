@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { authService } from '../../services/api/authService';
+import { useAuth } from '../../contexts/AuthContext';
 import { LoginCredentials } from '../../types/auth.types';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: ''
@@ -43,16 +44,8 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await authService.login(credentials);
-      
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-
-      if (response.user.role === 'hr') {
-        navigate('/hr/dashboard');
-      } else {
-        navigate('/employee/dashboard');
-      }
+      await login(credentials);
+      navigate('/dashboard');
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Login failed');
     } finally {
