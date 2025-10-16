@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+import API_BASE_URL from './apiConfig';
 
 export interface HikeAnalysis {
   current_ctc: number;
