@@ -1,96 +1,120 @@
-import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useTheme } from "../../contexts/ThemeContext";
+import React, { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Target,
   Users,
-  BarChart2,
-  FileText,
-  Bot,
-  BadgePercent,
-  HelpCircle,
-  MessageSquare,
-  BookOpen,
-  TrendingUp,
-  Shield,
-  Video,
-  Bell,
+  DollarSign,
+  BarChart3,
+  Mail,
   Settings,
-  LogOut
-} from "lucide-react";
+  HelpCircle,
+  LogOut,
+  ChevronDown,
+  User as UserIcon
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Button } from '../common/Button';
 
+const menuItems = [
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/hiresmart', label: 'HireSmart', icon: Target },
+  { path: '/automatch', label: 'AutoMatch', icon: Users },
+  { path: '/salary-analysis', label: 'Salary Analysis', icon: DollarSign },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/messages', label: 'Messages', icon: Mail },
+  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/help', label: 'Help & Info', icon: HelpCircle }
+];
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { darkMode } = useTheme();
+  const { user, logout } = useAuth();
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-
-  const navItemClasses = (path: string) =>
-    `w-full flex items-center gap-2 px-3 py-2 text-[0.93rem] font-medium rounded-lg mb-1 transition-all
-    ${location.pathname === path ? "bg-blue-600 text-white shadow-md" : darkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`;
-
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
-    <div className={`w-60 h-screen fixed left-0 top-0 border-r flex flex-col justify-between
-      ${darkMode ? "bg-gradient-to-b from-gray-800 to-gray-900 border-gray-700" : "bg-gradient-to-b from-blue-50 to-white border-gray-200"}
-    `}>
-      {/* TOP: Logo & Brand */}
-      <div>
-        <div className={`p-4 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-white" />
+    <div className="w-64 bg-gray-900 text-white min-h-screen flex flex-col relative">
+      {/* Logo */}
+      <div className="p-6 border-b border-gray-800">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <UserIcon className="w-5 h-5" />
+          </div>
+          <span className="text-xl font-bold">HumaNet</span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-4 py-6 space-y-2">
+        {menuItems.map(item => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User Profile & Logout */}
+      <div className="p-4 border-t border-gray-800">
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileDropdown(prev => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <UserIcon className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium">{user?.name || 'User'}</p>
+                <p className="text-xs text-gray-400 capitalize">{user?.role || 'Role'}</p>
+              </div>
             </div>
-            <div>
-              <h1 className={`text-lg font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Humanet</h1>
-              <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-600"}`}>HR Portal</p>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showProfileDropdown && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-gray-700 transition-colors text-red-400"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Logout</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showLogoutConfirm && (
+        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white text-gray-900 rounded-lg shadow-xl p-6 w-72">
+            <h3 className="text-lg font-semibold mb-2">Confirm Logout</h3>
+            <p className="text-sm text-gray-600 mb-4">Are you sure you want to logout?</p>
+            <div className="flex items-center justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleLogout}>Logout</Button>
             </div>
           </div>
         </div>
-        {/* MAIN NAV SECTIONS */}
-        <nav className="px-3 py-4">
-          {/* Core HR Management */}
-          <button className={navItemClasses("/hr/dashboard")}       onClick={() => navigate("/hr/dashboard")}>         <LayoutDashboard className="w-5 h-5" /> Dashboard</button>
-          <button className={navItemClasses("/hr/employee")}        onClick={() => navigate("/hr/employee")}>          <Users className="w-5 h-5" /> Employee</button>
-          <button className={navItemClasses("/hr/automatch")}       onClick={() => navigate("/hr/automatch")}>         <BarChart2 className="w-5 h-5" /> AutoMatch</button>
-          <button className={navItemClasses("/hr/hire")}            onClick={() => navigate("/hr/hire")}>               <FileText className="w-5 h-5" /> HireSmart</button>
-          <button className={navItemClasses("/hr/portal")}          onClick={() => navigate("/hr/portal")}>              <BookOpen className="w-5 h-5" /> Portal</button>
-          <button className={navItemClasses("/hr/salary-prediction")} onClick={() => navigate("/hr/salary-prediction")}> <BadgePercent className="w-5 h-5" /> SalaryPrediction</button>
-          <button className={navItemClasses("/hr/hr-assistance")}   onClick={() => navigate("/hr/hr-assistance")}>      <Bot className="w-5 h-5" /> HR Assistance</button>
-          
-          {/* Advanced AI/Verification */}
-          <button className={navItemClasses("/hr/fraud-detection")} onClick={() => navigate("/hr/fraud-detection")}>   <Shield className="w-5 h-5" /> Fraud Detection</button>
-          <button className={navItemClasses("/hr/proctored-interview")} onClick={() => navigate("/hr/proctored-interview")}> <Video className="w-5 h-5" /> Proctored Interview</button>
-          <button className={navItemClasses("/hr/hike-expectation-analyzer")} onClick={() => navigate("/hr/hike-expectation-analyzer")}> <TrendingUp className="w-5 h-5" /> Hike Analyzer</button>
-          
-          {/* Communication */}
-          <button className={navItemClasses("/hr/message")}         onClick={() => navigate("/hr/message")}>            <MessageSquare className="w-5 h-5" /> Message</button>
-          <button className={navItemClasses("/hr/noticeboard")}     onClick={() => navigate("/hr/noticeboard")}>        <Bell className="w-5 h-5" /> NoticeBoard</button>
-
-          {/* Offer Management (NEW) */}
-          <button className={navItemClasses("/hr/offers")} onClick={() => navigate("/hr/offers")}> <FileText className="w-5 h-5" /> Offers</button>
-        </nav>
-      </div>
-
-      {/* BOTTOM: Settings, Help, Logout (always visible) */}
-      <div className={`p-3 border-t ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
-        <button className={navItemClasses("/hr/settings")}   onClick={() => navigate("/hr/settings")}>      <Settings className="w-5 h-5" /> Settings</button>
-        <button className={navItemClasses("/hr/help-info")}  onClick={() => navigate("/hr/help-info")}>     <HelpCircle className="w-5 h-5" /> Help & Info</button>
-        <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            navigate("/login");
-          }}
-          className={`w-full flex items-center gap-2 px-3 py-2 text-[0.93rem] font-medium rounded-lg mt-1 ${
-            darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-700 hover:bg-red-50"
-          }`}
-        >
-          <LogOut className="w-5 h-5" />
-          Log Out
-        </button>
-      </div>
+      )}
     </div>
   );
 };
