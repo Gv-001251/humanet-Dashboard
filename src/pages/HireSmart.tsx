@@ -49,15 +49,29 @@ export const HireSmart: React.FC = () => {
       if (!response.ok) throw new Error('Failed to upload resumes');
 
       const data = await response.json();
-      if (data.success) {
-        setCandidates(prev => [...prev, ...data.data]);
+      if (data.success && Array.isArray(data.data)) {
+        const parsedCandidates: Candidate[] = data.data.map((candidate: any): Candidate => ({
+          id: String(candidate.id ?? candidate._id ?? `cand-${Date.now()}`),
+          name: candidate.name ?? 'Unknown Candidate',
+          email: candidate.email ?? 'unknown@example.com',
+          phone: candidate.phone ?? '+91 9876543210',
+          skills: Array.isArray(candidate.skills) ? candidate.skills : [],
+          experience: Number(candidate.experience ?? candidate.experience_years ?? 0),
+          ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
+          location: candidate.location ?? 'Bangalore',
+          domain: candidate.domain ?? 'General',
+          atsScore: Number(candidate.atsScore ?? candidate.ats_score ?? 60),
+          status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
+          education: candidate.education ?? 'Not specified'
+        }));
+        setCandidates(prev => [...prev, ...parsedCandidates]);
       }
     } catch (error) {
       console.error('Error uploading resumes:', error);
       alert('Failed to upload resumes. Using mock data for demo.');
       
       // Mock data for demo
-      const mockCandidates = Array.from({ length: files.length }, (_, i) => ({
+      const mockCandidates: Candidate[] = Array.from({ length: files.length }, (_, i) => ({
         id: `cand-${Date.now()}-${i}`,
         name: `Candidate ${i + 1}`,
         email: `candidate${i + 1}@example.com`,

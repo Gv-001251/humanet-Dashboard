@@ -76,12 +76,13 @@ export const SalaryAnalysis: React.FC = () => {
     setHistory(prev => [result, ...prev.slice(0, 4)]);
   };
 
+  const baseIdealSalary = prediction?.ideal ?? 1200000;
   const regionalComparison = [
-    { city: 'Bangalore', salary: prediction?.ideal || 1200000 },
-    { city: 'Mumbai', salary: (prediction?.ideal || 1200000) * 0.96 },
-    { city: 'Hyderabad', salary: (prediction?.ideal || 1200000) * 0.92 },
-    { city: 'Chennai', salary: (prediction?.ideal || 1200000) * 0.83 },
-    { city: 'Coimbatore', salary: (prediction?.ideal || 1200000) * 0.75 }
+    { city: 'Bangalore', salary: baseIdealSalary },
+    { city: 'Mumbai', salary: baseIdealSalary * 0.96 },
+    { city: 'Hyderabad', salary: baseIdealSalary * 0.92 },
+    { city: 'Chennai', salary: baseIdealSalary * 0.83 },
+    { city: 'Coimbatore', salary: baseIdealSalary * 0.75 }
   ];
 
   const pieData = prediction
@@ -235,7 +236,7 @@ export const SalaryAnalysis: React.FC = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }) => `${name}: ${(Number(percent) * 100).toFixed(0)}%`}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"

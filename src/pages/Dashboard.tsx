@@ -46,7 +46,7 @@ export const Dashboard: React.FC = () => {
     { month: 'Jun', amount: 425000 }
   ]);
 
-  const [recentActivities, setRecentActivities] = useState([
+  const [recentActivities, setRecentActivities] = useState<Array<{ id: string | number; text: string; time: string; type: string }>>([
     { id: 1, text: 'New candidate shortlisted: John Doe', time: '10 mins ago', type: 'candidate' },
     { id: 2, text: 'Project "AI Dashboard" completed', time: '1 hour ago', type: 'project' },
     { id: 3, text: 'Offer sent to Sarah Johnson', time: '2 hours ago', type: 'offer' },
@@ -183,7 +183,7 @@ export const Dashboard: React.FC = () => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name}: ${(Number(percent) * 100).toFixed(0)}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
