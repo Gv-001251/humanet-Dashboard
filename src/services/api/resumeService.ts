@@ -13,6 +13,13 @@ export interface Candidate {
   expected_ctc: number;
   notice_period: number;
   education: string;
+  location?: string;
+  domain?: string;
+  ats_score?: number;
+  ats_details?: {
+    matched_keywords: string[];
+    total_keywords: number;
+  };
   certifications: string[];
   fraud_check: {
     is_verified: boolean;
@@ -25,50 +32,96 @@ export interface Candidate {
 }
 
 export interface ResumeUploadRequest {
-  name: string;
-  email: string;
-  phone: string;
-  current_ctc: number;
-  expected_ctc: number;
-  notice_period: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  current_ctc?: number;
+  expected_ctc?: number;
+  notice_period?: number;
+  location?: string;
+  domain?: string;
+  experience_years?: number;
+  education?: string;
+  required_keywords?: string[];
+  status?: string;
   resume: File;
 }
 
 export interface CandidateFilters {
   skills?: string[];
-  minExp?: number;
-  maxExp?: number;
-  minCtc?: number;
-  maxCtc?: number;
+  experience_min?: number;
+  experience_max?: number;
+  ctc_min?: number;
+  ctc_max?: number;
+  location?: string;
+  domain?: string;
+  ats_min?: number;
   status?: string;
+  search?: string;
+  sort_by?: 'ats_score' | 'experience' | 'current_ctc' | 'applied_date';
 }
 
 export class ResumeService {
   static async getAllCandidates(filters?: CandidateFilters): Promise<Candidate[]> {
     try {
       const params = new URLSearchParams();
-      
-      if (filters?.skills) {
-        params.append('skills', filters.skills.join(','));
+      const legacyFilters = filters as {
+        minExp?: number;
+        maxExp?: number;
+        minCtc?: number;
+        maxCtc?: number;
+      };
+
+      if (filters?.skills?.length) {
+        filters.skills.forEach(skill => params.append('skills[]', skill));
       }
-      if (filters?.minExp !== undefined) {
-        params.append('minExp', filters.minExp.toString());
+
+      const experienceMin = filters?.experience_min ?? legacyFilters?.minExp;
+      if (experienceMin !== undefined) {
+        params.append('experience_min', experienceMin.toString());
       }
-      if (filters?.maxExp !== undefined) {
-        params.append('maxExp', filters.maxExp.toString());
+
+      const experienceMax = filters?.experience_max ?? legacyFilters?.maxExp;
+      if (experienceMax !== undefined) {
+        params.append('experience_max', experienceMax.toString());
       }
-      if (filters?.minCtc !== undefined) {
-        params.append('minCtc', filters.minCtc.toString());
+
+      const ctcMin = filters?.ctc_min ?? legacyFilters?.minCtc;
+      if (ctcMin !== undefined) {
+        params.append('ctc_min', ctcMin.toString());
       }
-      if (filters?.maxCtc !== undefined) {
-        params.append('maxCtc', filters.maxCtc.toString());
+
+      const ctcMax = filters?.ctc_max ?? legacyFilters?.maxCtc;
+      if (ctcMax !== undefined) {
+        params.append('ctc_max', ctcMax.toString());
       }
+
+      if (filters?.location) {
+        params.append('location', filters.location);
+      }
+
+      if (filters?.domain) {
+        params.append('domain', filters.domain);
+      }
+
+      if (filters?.ats_min !== undefined) {
+        params.append('ats_min', filters.ats_min.toString());
+      }
+
       if (filters?.status) {
         params.append('status', filters.status);
       }
-      
-      const url = `${API_BASE_URL}/candidates${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
+
+      if (filters?.search) {
+        params.append('search', filters.search);
+      }
+
+      if (filters?.sort_by) {
+        params.append('sort_by', filters.sort_by);
+      }
+
+      const query = params.toString();
+      const response = await fetch(`${API_BASE_URL}/candidates${query ? `?${query}` : ''}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch candidates');
@@ -97,12 +150,20 @@ export class ResumeService {
   static async uploadResume(uploadData: ResumeUploadRequest): Promise<Candidate> {
     try {
       const formData = new FormData();
-      formData.append('name', uploadData.name);
-      formData.append('email', uploadData.email);
-      formData.append('phone', uploadData.phone);
-      formData.append('current_ctc', uploadData.current_ctc.toString());
-      formData.append('expected_ctc', uploadData.expected_ctc.toString());
-      formData.append('notice_period', uploadData.notice_period.toString());
+      
+      if (uploadData.name) formData.append('name', uploadData.name);
+      if (uploadData.email) formData.append('email', uploadData.email);
+      if (uploadData.phone) formData.append('phone', uploadData.phone);
+      if (uploadData.current_ctc !== undefined) formData.append('current_ctc', uploadData.current_ctc.toString());
+      if (uploadData.expected_ctc !== undefined) formData.append('expected_ctc', uploadData.expected_ctc.toString());
+      if (uploadData.notice_period !== undefined) formData.append('notice_period', uploadData.notice_period.toString());
+      if (uploadData.location) formData.append('location', uploadData.location);
+      if (uploadData.domain) formData.append('domain', uploadData.domain);
+      if (uploadData.experience_years !== undefined) formData.append('experience_years', uploadData.experience_years.toString());
+      if (uploadData.education) formData.append('education', uploadData.education);
+      if (uploadData.status) formData.append('status', uploadData.status);
+      if (uploadData.required_keywords) formData.append('required_keywords', uploadData.required_keywords.join(','));
+      
       formData.append('resume', uploadData.resume);
 
       const response = await fetch(`${API_BASE_URL}/candidates/upload`, {
@@ -111,12 +172,73 @@ export class ResumeService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload resume');
+        const errorText = await response.text();
+        throw new Error(`Failed to upload resume: ${errorText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      return Array.isArray(result.candidates) ? result.candidates[0] : result;
     } catch (error) {
       console.error('Error uploading resume:', error);
+      throw error;
+    }
+  }
+
+  static async uploadResumes(uploadItems: ResumeUploadRequest[]): Promise<Candidate[]> {
+    try {
+      if (!uploadItems.length) {
+        throw new Error('No resumes provided');
+      }
+
+      const formData = new FormData();
+      const metadataPayload = uploadItems.map(({ resume, required_keywords, ...rest }) => {
+        const metadata: Record<string, unknown> = { ...rest };
+        if (required_keywords && required_keywords.length) {
+          metadata.required_keywords = required_keywords;
+        }
+
+        Object.keys(metadata).forEach(key => {
+          const value = metadata[key];
+          if (value === undefined || value === null || value === '') {
+            delete metadata[key];
+          }
+        });
+
+        return metadata;
+      });
+
+      if (metadataPayload.some(item => Object.keys(item).length > 0)) {
+        formData.append('metadata', JSON.stringify(metadataPayload));
+      }
+
+      uploadItems.forEach(item => {
+        formData.append('resumes', item.resume);
+      });
+
+      const response = await fetch(`${API_BASE_URL}/candidates/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to upload resumes: ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (Array.isArray(result?.candidates)) {
+        return result.candidates;
+      }
+      if (Array.isArray(result)) {
+        return result;
+      }
+      if (result) {
+        return [result];
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Error uploading resumes:', error);
       throw error;
     }
   }
