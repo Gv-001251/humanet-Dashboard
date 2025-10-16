@@ -4,6 +4,8 @@ const { MongoClient } = require('mongodb');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 require('dotenv').config();
 
 const app = express();
@@ -199,6 +201,8 @@ async function insertSampleData() {
         expected_ctc: 1200000,
         notice_period: 30,
         education: 'Bachelor of Technology in Computer Science - IIT Bombay, 2019',
+        location: 'Bangalore',
+        domain: 'web-dev',
         certifications: ['AWS Certified Developer', 'MongoDB Certified Developer'],
         fraud_check: {
           is_verified: true,
@@ -222,6 +226,8 @@ async function insertSampleData() {
         expected_ctc: 900000,
         notice_period: 45,
         education: 'Master of Design in User Experience - NID, 2020',
+        location: 'Mumbai',
+        domain: 'web-dev',
         certifications: ['Google UX Design Certificate', 'Adobe Certified Expert'],
         fraud_check: {
           is_verified: true,
@@ -245,6 +251,8 @@ async function insertSampleData() {
         expected_ctc: 1500000,
         notice_period: 60,
         education: 'Bachelor of Engineering in Computer Science - VIT, 2018',
+        location: 'Hyderabad',
+        domain: 'devops',
         certifications: ['AWS Certified Solutions Architect', 'Certified Kubernetes Administrator'],
         fraud_check: {
           is_verified: true,
@@ -268,6 +276,8 @@ async function insertSampleData() {
         expected_ctc: 750000,
         notice_period: 15,
         education: 'Bachelor of Technology in Information Technology - Anna University, 2021',
+        location: 'Chennai',
+        domain: 'web-dev',
         certifications: ['React Developer Certificate'],
         fraud_check: {
           is_verified: false,
@@ -291,6 +301,8 @@ async function insertSampleData() {
         expected_ctc: 1600000,
         notice_period: 90,
         education: 'Master of Technology in Computer Science - IIT Delhi, 2017',
+        location: 'Delhi',
+        domain: 'web-dev',
         certifications: ['Python Institute Certification'],
         fraud_check: {
           is_verified: true,
@@ -314,6 +326,8 @@ async function insertSampleData() {
         expected_ctc: 1000000,
         notice_period: 30,
         education: 'Bachelor of Technology in Computer Science - BITS Pilani, 2020',
+        location: 'Pune',
+        domain: 'web-dev',
         certifications: ['MongoDB Developer Certificate'],
         fraud_check: {
           is_verified: true,
@@ -634,48 +648,121 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-app.post('/api/candidates/upload', upload.single('resume'), async (req, res) => {
+app.post('/api/candidates/upload', upload.fields([{ name: 'resumes', maxCount: 20 }, { name: 'resume', maxCount: 1 }]), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    const uploadedFiles = [];
+    if (req.files) {
+      const fileGroups = req.files;
+      if (Array.isArray(fileGroups.resumes)) {
+        uploadedFiles.push(...fileGroups.resumes);
+      }
+      if (Array.isArray(fileGroups.resume)) {
+        uploadedFiles.push(...fileGroups.resume);
+      }
     }
-    
-    // Parse resume text (basic implementation)
-    const resumeText = await parseResumeText(req.file.path, req.file.mimetype);
-    
-    const candidate = {
-      _id: `candidate${Date.now()}`,
-      name: req.body.name || 'Unknown',
-      email: req.body.email || '',
-      phone: req.body.phone || '',
-      resume_url: `/uploads/${req.file.filename}`,
-      resume_text: resumeText,
-      skills: extractSkillsFromText(resumeText),
-      experience_years: extractExperienceFromText(resumeText),
-      current_ctc: parseInt(req.body.current_ctc) || 0,
-      expected_ctc: parseInt(req.body.expected_ctc) || 0,
-      notice_period: parseInt(req.body.notice_period) || 0,
-      education: extractEducationFromText(resumeText),
-      certifications: extractCertificationsFromText(resumeText),
-      fraud_check: {
-        is_verified: false,
-        risk_score: Math.floor(Math.random() * 30) + 10, // Random score for demo
-        flags: []
-      },
-      application_status: 'new',
-      applied_date: new Date(),
-      created_at: new Date()
-    };
-    
-    if (db) {
-      const result = await db.collection('candidates').insertOne(candidate);
-      res.status(201).json({ ...candidate, _id: result.insertedId });
-    } else {
-      candidatesData.push(candidate);
-      res.status(201).json(candidate);
+
+    if (!uploadedFiles.length) {
+      return res.status(400).json({ error: 'No resumes uploaded' });
     }
+
+    let metadataList = [];
+    if (req.body.metadata) {
+      try {
+        const parsed = JSON.parse(req.body.metadata);
+        if (Array.isArray(parsed)) {
+          metadataList = parsed;
+        }
+      } catch (parseError) {
+        console.warn('Unable to parse metadata payload:', parseError);
+      }
+    }
+
+    if (!metadataList.length && (req.body.name || req.body.email || req.body.phone)) {
+      metadataList = [{
+        name: req.body.name,
+        email: req.body.email,
+        phone: req.body.phone,
+        current_ctc: req.body.current_ctc,
+        expected_ctc: req.body.expected_ctc,
+        notice_period: req.body.notice_period,
+        location: req.body.location,
+        domain: req.body.domain,
+        required_keywords: req.body.required_keywords ? req.body.required_keywords.split(',').map(kw => kw.trim()) : undefined
+      }];
+    }
+
+    const createdCandidates = [];
+
+    for (let index = 0; index < uploadedFiles.length; index++) {
+      const file = uploadedFiles[index];
+      const metadata = metadataList[index] || {};
+      const resumeText = await parseResumeText(file.path, file.mimetype);
+      const sanitizedText = resumeText ? resumeText.replace(/\r/g, '').trim() : '';
+      const extractedSkills = metadata.skills && Array.isArray(metadata.skills) && metadata.skills.length
+        ? metadata.skills
+        : extractSkillsFromText(sanitizedText);
+      const uniqueSkills = Array.from(new Set(extractedSkills.map(skill => skill.trim()).filter(Boolean)));
+      const contactInfo = extractContactDetailsFromText(sanitizedText);
+      const experienceYears = metadata.experience_years !== undefined
+        ? Number(metadata.experience_years)
+        : extractExperienceFromText(sanitizedText);
+      const education = metadata.education || extractEducationFromText(sanitizedText);
+      const location = metadata.location || extractLocationFromText(sanitizedText);
+      const domain = metadata.domain || extractDomainFromText(sanitizedText, uniqueSkills);
+      const atsResult = calculateATSScoreFromText(
+        sanitizedText,
+        domain,
+        metadata.required_keywords || metadata.keywords || uniqueSkills
+      );
+
+      const candidatePayload = {
+        _id: `candidate${Date.now()}-${index}`,
+        name: deriveCandidateName(metadata.name, contactInfo.name, file.originalname),
+        email: (metadata.email || contactInfo.email || '').toLowerCase(),
+        phone: formatPhoneNumber(metadata.phone || contactInfo.phone || ''),
+        resume_url: `/uploads/${file.filename}`,
+        resume_text: sanitizedText,
+        skills: uniqueSkills,
+        experience_years: experienceYears,
+        current_ctc: Number(metadata.current_ctc) || 0,
+        expected_ctc: Number(metadata.expected_ctc) || 0,
+        notice_period: Number(metadata.notice_period) || 0,
+        education,
+        location,
+        domain,
+        ats_score: atsResult.score,
+        ats_details: {
+          matched_keywords: atsResult.matchedKeywords,
+          total_keywords: atsResult.totalKeywords
+        },
+        status: metadata.status || 'new',
+        application_status: metadata.status || 'new',
+        fraud_check: {
+          is_verified: false,
+          risk_score: Math.floor(Math.random() * 30) + 10,
+          flags: []
+        },
+        applied_date: new Date(),
+        created_at: new Date()
+      };
+
+      if (db) {
+        const result = await db.collection('candidates').insertOne(candidatePayload);
+        candidatePayload._id = result.insertedId;
+      } else {
+        candidatesData.push(candidatePayload);
+      }
+
+      createdCandidates.push(candidatePayload);
+    }
+
+    res.status(201).json({
+      message: `Successfully processed ${createdCandidates.length} resume${createdCandidates.length !== 1 ? 's' : ''}`,
+      candidates: createdCandidates
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to process resume upload' });
+    console.error('Resume upload error:', error);
+    res.status(500).json({ error: 'Failed to process resume upload', details: error.message });
   }
 });
 
@@ -1437,16 +1524,18 @@ app.get('/api/jobs/:id/matches', async (req, res) => {
 
 // Utility functions
 async function parseResumeText(filePath, mimeType) {
-  // Basic text extraction - in production, use proper PDF/DOCX parsing libraries
   try {
     if (mimeType === 'application/pdf') {
-      // For PDF files, you would use pdf-parse library
-      return 'PDF content extracted - implement proper PDF parsing';
+      // Parse PDF files using pdf-parse
+      const dataBuffer = fs.readFileSync(filePath);
+      const pdfData = await pdfParse(dataBuffer);
+      return pdfData.text;
     } else if (mimeType.includes('wordprocessingml') || mimeType.includes('msword')) {
-      // For DOCX/DOC files, you would use mammoth library
-      return 'DOC content extracted - implement proper DOC parsing';
+      // Parse DOCX files using mammoth
+      const result = await mammoth.extractRawText({ path: filePath });
+      return result.value;
     }
-    return 'Text content extracted';
+    return '';
   } catch (error) {
     console.error('Error parsing resume:', error);
     return '';
@@ -1454,7 +1543,17 @@ async function parseResumeText(filePath, mimeType) {
 }
 
 function extractSkillsFromText(text) {
-  const commonSkills = ['JavaScript', 'React', 'Node.js', 'Python', 'Java', 'SQL', 'MongoDB', 'AWS', 'Git'];
+  const commonSkills = [
+    'JavaScript', 'React', 'Node.js', 'Python', 'Java', 'SQL', 'MongoDB', 'AWS', 'Git',
+    'TypeScript', 'Vue.js', 'Angular', 'Express.js', 'Docker', 'Kubernetes', 'Redis',
+    'PostgreSQL', 'MySQL', 'GraphQL', 'REST API', 'Microservices', 'CI/CD', 'HTML', 'CSS',
+    'C++', 'C#', '.NET', 'PHP', 'Laravel', 'Django', 'Flask', 'Spring Boot', 'Ruby',
+    'Go', 'Rust', 'Swift', 'Kotlin', 'Android', 'iOS', 'React Native', 'Flutter',
+    'Machine Learning', 'AI', 'Data Science', 'TensorFlow', 'PyTorch', 'Pandas', 'NumPy',
+    'Tableau', 'Power BI', 'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator',
+    'Jenkins', 'GitLab', 'GitHub', 'Jira', 'Agile', 'Scrum', 'Azure', 'GCP', 'Terraform'
+  ];
+  
   const foundSkills = commonSkills.filter(skill => 
     text.toLowerCase().includes(skill.toLowerCase())
   );
@@ -1462,25 +1561,244 @@ function extractSkillsFromText(text) {
 }
 
 function extractExperienceFromText(text) {
-  const expMatch = text.match(/(\d+)\s*(?:year|yr)s?\s*(?:of\s*)?experience/i);
-  return expMatch ? parseInt(expMatch[1]) : 0;
+  const experienceMatches = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:year|yr)s?\s*(?:of\s*(?:hands-on\s*)?)?experience/gi)];
+  if (experienceMatches.length > 0) {
+    const numericValues = experienceMatches.map(match => parseFloat(match[1]));
+    return Math.max(...numericValues);
+  }
+
+  const alternateMatch = text.match(/experience\s*[:\-]\s*(\d+(?:\.\d+)?)/i);
+  if (alternateMatch) {
+    return parseFloat(alternateMatch[1]);
+  }
+
+  return 0;
 }
 
 function extractEducationFromText(text) {
-  if (text.toLowerCase().includes('bachelor') || text.toLowerCase().includes('btech')) {
-    return 'Bachelor\'s Degree';
+  const educationPatterns = [
+    { regex: /(b\.?tech|bachelor\s+of\s+technology|be\b|bachelor\s+of\s+engineering)/i, value: "Bachelor's Degree" },
+    { regex: /(m\.?tech|master\s+of\s+technology|me\b|master\s+of\s+engineering)/i, value: "Master's Degree" },
+    { regex: /(bsc|b\.s\.|bachelor\s+of\s+science)/i, value: "Bachelor's Degree" },
+    { regex: /(msc|m\.s\.|master\s+of\s+science)/i, value: "Master's Degree" },
+    { regex: /(mba|master\s+of\s+business\s+administration)/i, value: 'MBA' },
+    { regex: /(ph\.d|phd|doctorate)/i, value: 'PhD' },
+    { regex: /(diploma)/i, value: 'Diploma' }
+  ];
+
+  const degrees = educationPatterns
+    .filter(pattern => pattern.regex.test(text))
+    .map(pattern => pattern.value);
+
+  if (degrees.length > 0) {
+    return Array.from(new Set(degrees)).join(', ');
   }
-  if (text.toLowerCase().includes('master') || text.toLowerCase().includes('mtech')) {
-    return 'Master\'s Degree';
-  }
+
   return 'Education details not specified';
 }
 
 function extractCertificationsFromText(text) {
-  const certs = [];
-  if (text.toLowerCase().includes('aws')) certs.push('AWS Certified');
-  if (text.toLowerCase().includes('google')) certs.push('Google Certified');
-  return certs;
+  const certificationsCatalog = [
+    { keyword: 'aws', label: 'AWS Certified' },
+    { keyword: 'azure', label: 'Microsoft Azure Certified' },
+    { keyword: 'google', label: 'Google Cloud Certified' },
+    { keyword: 'pmp', label: 'PMP Certified' },
+    { keyword: 'scrum', label: 'Scrum Certified' },
+    { keyword: 'oracle', label: 'Oracle Certified' },
+    { keyword: 'salesforce', label: 'Salesforce Certified' },
+    { keyword: 'red hat', label: 'Red Hat Certified' }
+  ];
+
+  const lowerText = text.toLowerCase();
+  const certs = certificationsCatalog
+    .filter(cert => lowerText.includes(cert.keyword))
+    .map(cert => cert.label);
+
+  return Array.from(new Set(certs));
+}
+
+function extractContactDetailsFromText(text) {
+  if (!text) {
+    return { name: '', email: '', phone: '' };
+  }
+
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i;
+  const phoneRegex = /\+?\d[\d\s()-]{7,}\d/g;
+
+  const emailMatch = text.match(emailRegex);
+  const phoneMatches = text.match(phoneRegex);
+
+  let phone = '';
+  if (phoneMatches) {
+    const formatted = phoneMatches
+      .map(match => formatPhoneNumber(match))
+      .find(number => number.length >= 10);
+    phone = formatted || '';
+  }
+
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  const ignoredKeywords = ['resume', 'curriculum', 'vitae', 'profile', 'summary', 'experience', 'objective', 'contact'];
+  const nameLine = lines.find(line => {
+    const lower = line.toLowerCase();
+    if (ignoredKeywords.some(keyword => lower.includes(keyword))) {
+      return false;
+    }
+    if (emailMatch && line.includes(emailMatch[0])) {
+      return false;
+    }
+    if (phoneMatches && phoneMatches.some(match => line.includes(match))) {
+      return false;
+    }
+    const wordCount = line.split(/\s+/).length;
+    return wordCount >= 2 && wordCount <= 5;
+  });
+
+  return {
+    name: nameLine ? capitalizeWords(nameLine) : '',
+    email: emailMatch ? emailMatch[0].toLowerCase() : '',
+    phone
+  };
+}
+
+function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length >= 10 && digits.length <= 13) {
+    return digits;
+  }
+  return phone.replace(/\s+/g, ' ').trim();
+}
+
+function deriveCandidateName(metadataName, extractedName, filename) {
+  if (metadataName && metadataName.trim()) {
+    return capitalizeWords(metadataName.trim());
+  }
+  if (extractedName && extractedName.trim()) {
+    return capitalizeWords(extractedName.trim());
+  }
+  const cleanedFilename = filename
+    .replace(/\.(pdf|docx|doc)$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\d+/g, ' ')
+    .trim();
+  if (cleanedFilename) {
+    return capitalizeWords(cleanedFilename);
+  }
+  return 'Candidate';
+}
+
+function capitalizeWords(value) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function calculateATSScoreFromText(text, domain, requiredKeywords) {
+  const generalKeywords = [
+    'javascript', 'typescript', 'node.js', 'node', 'react', 'angular', 'vue',
+    'html', 'css', 'full stack', 'frontend', 'backend', 'api', 'rest', 'git',
+    'sql', 'mysql', 'postgres', 'mongodb', 'python', 'java', 'aws', 'azure',
+    'docker', 'kubernetes', 'microservices', 'cloud', 'testing', 'ci/cd'
+  ];
+
+  const domainKeywordMap = {
+    'web-dev': ['frontend', 'backend', 'full stack', 'responsive', 'ui', 'ux', 'typescript', 'javascript', 'css', 'html', 'react', 'node', 'express'],
+    'ai-ml': ['machine learning', 'deep learning', 'data science', 'tensorflow', 'pytorch', 'numpy', 'pandas', 'scikit', 'model', 'prediction'],
+    'mobile': ['android', 'ios', 'kotlin', 'swift', 'react native', 'flutter', 'mobile', 'play store', 'app store'],
+    'devops': ['devops', 'ci/cd', 'continuous integration', 'docker', 'kubernetes', 'terraform', 'infrastructure', 'aws', 'azure', 'gcp', 'pipeline', 'monitoring'],
+    'data-science': ['data analysis', 'analytics', 'business intelligence', 'tableau', 'power bi', 'sql', 'data visualization', 'statistics', 'ml']
+  };
+
+  const normalizedRequired = Array.isArray(requiredKeywords)
+    ? requiredKeywords
+        .map(keyword => keyword?.toString().toLowerCase())
+        .filter(Boolean)
+    : [];
+
+  const keywordsSet = new Set([
+    ...generalKeywords,
+    ...(domainKeywordMap[domain] || []),
+    ...normalizedRequired
+  ]);
+
+  keywordsSet.delete('');
+
+  const keywords = Array.from(keywordsSet);
+  if (!keywords.length) {
+    return { score: 0, matchedKeywords: [], totalKeywords: 0 };
+  }
+
+  const lowerText = text.toLowerCase();
+  const matchedKeywords = keywords.filter(keyword => lowerText.includes(keyword));
+
+  const score = Math.round((matchedKeywords.length / keywords.length) * 100);
+
+  return {
+    score: Math.min(score, 100),
+    matchedKeywords,
+    totalKeywords: keywords.length
+  };
+}
+
+function extractLocationFromText(text) {
+  const indianCities = [
+    'Bangalore', 'Bengaluru', 'Mumbai', 'Delhi', 'Pune', 'Hyderabad', 'Chennai', 
+    'Kolkata', 'Ahmedabad', 'Coimbatore', 'Jaipur', 'Kochi', 'Noida', 'Gurgaon', 
+    'Gurugram', 'Surat', 'Lucknow', 'Chandigarh', 'Trivandrum', 'Bhopal'
+  ];
+
+  const lowerText = text.toLowerCase();
+  
+  for (const city of indianCities) {
+    if (lowerText.includes(city.toLowerCase())) {
+      return city === 'Bengaluru' ? 'Bangalore' : city === 'Gurugram' ? 'Gurgaon' : city;
+    }
+  }
+
+  const locationMatch = text.match(/location\s*[:\-]\s*([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
+  if (locationMatch) {
+    return locationMatch[1].trim();
+  }
+
+  return '';
+}
+
+function extractDomainFromText(text, skills) {
+  const lowerText = text.toLowerCase();
+  const lowerSkills = skills.map(s => s.toLowerCase());
+
+  if (lowerSkills.some(s => ['react', 'vue', 'angular', 'node.js', 'javascript', 'typescript', 'html', 'css'].includes(s))) {
+    return 'web-dev';
+  }
+
+  if (lowerSkills.some(s => ['python', 'machine learning', 'ai', 'tensorflow', 'pytorch', 'pandas'].includes(s)) ||
+      lowerText.includes('data science') || lowerText.includes('machine learning')) {
+    return 'ai-ml';
+  }
+
+  if (lowerSkills.some(s => ['android', 'ios', 'react native', 'flutter', 'swift', 'kotlin'].includes(s)) ||
+      lowerText.includes('mobile') || lowerText.includes('app development')) {
+    return 'mobile';
+  }
+
+  if (lowerSkills.some(s => ['docker', 'kubernetes', 'aws', 'azure', 'terraform', 'ci/cd', 'jenkins'].includes(s)) ||
+      lowerText.includes('devops') || lowerText.includes('infrastructure')) {
+    return 'devops';
+  }
+
+  if (lowerSkills.some(s => ['tableau', 'power bi', 'data science', 'analytics'].includes(s)) ||
+      lowerText.includes('data analys') || lowerText.includes('business intelligence')) {
+    return 'data-science';
+  }
+
+  return 'web-dev';
 }
 
 function calculateShoppingRisk(offer) {
