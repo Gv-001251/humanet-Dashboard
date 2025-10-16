@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { Header } from '../../components/layout/Header';
-import { Send, Bot, User, Sparkles, TrendingUp, FileText, Users, Calendar } from 'lucide-react';
+import { Send, Bot, User, Sparkles, TrendingUp, FileText, Users, Calendar, Loader2 } from 'lucide-react';
+import { HRAssistanceService } from '../../services/api/hrAssistanceService';
 
 interface Message {
   id: string;
@@ -104,7 +105,7 @@ const HRAssistance: React.FC = () => {
     return `I understand you're asking about "${userMessage}". I can help you with:\n\n- 📊 Employee performance analytics\n- 📝 Job description generation\n- 👥 Team composition recommendations\n- 📅 Schedule optimization\n- 💰 Salary predictions\n- 🎯 Hiring strategies\n- 📈 Skill gap analysis\n- 🤖 Task automation\n\nPlease provide more specific details about what you'd like to know, or use one of the quick action buttons below!`;
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -115,22 +116,34 @@ const HRAssistance: React.FC = () => {
       type: 'text',
     };
 
+    const queryText = inputValue;
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
+    try {
+      const response = await HRAssistanceService.askQuery(queryText);
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content: generateAIResponse(inputValue),
+        content: response.response,
+        sender: 'ai',
+        timestamp: new Date(response.timestamp),
+        type: 'text',
+      };
+      setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      const fallbackResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content: generateAIResponse(queryText),
         sender: 'ai',
         timestamp: new Date(),
         type: 'text',
       };
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => [...prev, fallbackResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleQuickAction = (prompt: string) => {
@@ -246,11 +259,20 @@ const HRAssistance: React.FC = () => {
                 />
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputValue.trim()}
+                  disabled={!inputValue.trim() || isTyping}
                   className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <Send className="w-5 h-5" />
-                  Send
+                  {isTyping ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Thinking
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      Send
+                    </>
+                  )}
                 </button>
               </div>
             </div>

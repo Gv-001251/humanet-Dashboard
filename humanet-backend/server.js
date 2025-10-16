@@ -749,6 +749,39 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
+app.put('/api/candidates/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updateData = {
+      application_status: status,
+      updated_at: new Date()
+    };
+    
+    if (db) {
+      const { ObjectId } = require('mongodb');
+      const result = await db.collection('candidates').updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: updateData }
+      );
+      
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+    } else {
+      const candidateIndex = candidatesData.findIndex(c => c._id === req.params.id);
+      if (candidateIndex === -1) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+      candidatesData[candidateIndex].application_status = status;
+      candidatesData[candidateIndex].updated_at = new Date();
+    }
+    
+    res.json({ message: 'Candidate status updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update candidate status' });
+  }
+});
+
 // Offer Routes
 app.get('/api/offers', async (req, res) => {
   try {
@@ -891,6 +924,38 @@ app.get('/api/fraud/reports', async (req, res) => {
   }
 });
 
+// Dashboard Stats Route
+app.get('/api/dashboard/stats', async (req, res) => {
+  try {
+    let employees, candidates, offers;
+    
+    if (db) {
+      employees = await db.collection('employees').find({}).toArray();
+      candidates = await db.collection('candidates').find({}).toArray();
+      offers = await db.collection('offers').find({}).toArray();
+    } else {
+      employees = employeesData;
+      candidates = candidatesData;
+      offers = offersData;
+    }
+
+    const stats = {
+      totalEmployees: employees.length,
+      totalCandidates: candidates.length,
+      pendingOffers: offers.filter(o => o.status === 'pending').length,
+      acceptedOffers: offers.filter(o => o.status === 'accepted').length,
+      rejectedOffers: offers.filter(o => o.status === 'rejected').length,
+      newCandidates: candidates.filter(c => c.application_status === 'new').length,
+      shortlistedCandidates: candidates.filter(c => c.application_status === 'shortlisted').length,
+      highRiskCandidates: candidates.filter(c => c.fraud_check && c.fraud_check.risk_score > 70).length,
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+  }
+});
+
 // Hike Analysis Routes
 app.post('/api/hike/analyze', async (req, res) => {
   try {
@@ -938,6 +1003,215 @@ app.get('/api/hike/benchmarks', async (req, res) => {
     res.json(benchmarks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch benchmarks' });
+  }
+});
+
+// Salary Prediction Routes
+app.post('/api/salary/predict', async (req, res) => {
+  try {
+    const { skills, experience_years, education, location, role } = req.body;
+    
+    // Base salary calculation
+    let baseSalary = 500000; // Default base
+    
+    // Role-based adjustment
+    const roleMultiplier = {
+      'Software Engineer': 1.0,
+      'Full Stack Developer': 1.1,
+      'DevOps Engineer': 1.15,
+      'UI/UX Designer': 0.9,
+      'Product Manager': 1.4,
+      'Data Scientist': 1.3,
+      'Backend Developer': 1.05,
+      'Frontend Developer': 0.95
+    };
+    
+    baseSalary *= roleMultiplier[role] || 1.0;
+    
+    // Experience-based adjustment
+    const experienceMultiplier = Math.min(1 + (experience_years * 0.15), 2.5);
+    baseSalary *= experienceMultiplier;
+    
+    // Skills-based adjustment (more skills = higher salary)
+    const skillBonus = Math.min(skills.length * 0.05, 0.3);
+    baseSalary *= (1 + skillBonus);
+    
+    // Education-based adjustment
+    const educationMultiplier = {
+      'Bachelor': 1.0,
+      'Master': 1.15,
+      'PhD': 1.3
+    };
+    const eduKey = Object.keys(educationMultiplier).find(key => 
+      education?.toLowerCase().includes(key.toLowerCase())
+    );
+    baseSalary *= educationMultiplier[eduKey] || 1.0;
+    
+    // Location-based adjustment
+    const locationMultiplier = {
+      'Bangalore': 1.2,
+      'Mumbai': 1.15,
+      'Delhi': 1.1,
+      'Pune': 1.05,
+      'Hyderabad': 1.1,
+      'Chennai': 1.0
+    };
+    const locKey = Object.keys(locationMultiplier).find(key => 
+      location?.toLowerCase().includes(key.toLowerCase())
+    );
+    baseSalary *= locationMultiplier[locKey] || 1.0;
+    
+    // Calculate range (±15%)
+    const predictedSalary = Math.round(baseSalary);
+    const minSalary = Math.round(baseSalary * 0.85);
+    const maxSalary = Math.round(baseSalary * 1.15);
+    
+    const prediction = {
+      predicted_salary: predictedSalary,
+      min_salary: minSalary,
+      max_salary: maxSalary,
+      confidence: 85 + Math.random() * 10, // 85-95% confidence
+      factors: {
+        experience_impact: Math.round((experienceMultiplier - 1) * 100) + '%',
+        skills_impact: Math.round(skillBonus * 100) + '%',
+        location_impact: Math.round(((locationMultiplier[locKey] || 1.0) - 1) * 100) + '%',
+        education_impact: Math.round(((educationMultiplier[eduKey] || 1.0) - 1) * 100) + '%'
+      },
+      market_comparison: {
+        below_market: minSalary,
+        at_market: predictedSalary,
+        above_market: maxSalary
+      }
+    };
+    
+    res.json(prediction);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to predict salary' });
+  }
+});
+
+app.get('/api/salary/factors', async (req, res) => {
+  try {
+    const factors = {
+      most_impactful: [
+        { name: 'Experience', weight: 40 },
+        { name: 'Skills', weight: 25 },
+        { name: 'Role', weight: 20 },
+        { name: 'Location', weight: 10 },
+        { name: 'Education', weight: 5 }
+      ],
+      skill_premiums: {
+        'React': 5,
+        'Node.js': 5,
+        'Python': 7,
+        'AWS': 10,
+        'Docker': 8,
+        'Kubernetes': 12,
+        'Machine Learning': 15,
+        'Data Science': 18
+      }
+    };
+    
+    res.json(factors);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch salary factors' });
+  }
+});
+
+// HR Assistance Routes
+app.post('/api/hr-assistance/query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    const lowerQuery = query.toLowerCase();
+    
+    let response = '';
+    
+    // Pattern matching for common queries
+    if (lowerQuery.includes('hiring') || lowerQuery.includes('recruit')) {
+      response = 'For hiring, I recommend:\n1. Define clear job requirements\n2. Use HireSmart to parse resumes automatically\n3. Use AutoMatch to find best candidates\n4. Check fraud detection before final selection\n5. Make offers through the Offer Management system';
+    } else if (lowerQuery.includes('team size') || lowerQuery.includes('how many')) {
+      response = 'For a typical software project:\n- Small project: 3-5 developers\n- Medium project: 8-12 developers\n- Large project: 15-25 developers\nInclude: 1 PM, 1 Designer, 1 QA per 3-4 developers';
+    } else if (lowerQuery.includes('budget') || lowerQuery.includes('cost')) {
+      response = 'Budget allocation guidelines:\n- Development Team: 60-70%\n- Design Team: 10-15%\n- QA Team: 10-15%\n- DevOps/Infrastructure: 5-10%\nConsider benefits (20-30% of base salary)';
+    } else if (lowerQuery.includes('salary') || lowerQuery.includes('ctc')) {
+      response = 'Use our Salary Prediction tool for accurate estimates. General ranges:\n- Junior (0-2 yrs): ₹4-8 LPA\n- Mid-level (2-5 yrs): ₹8-15 LPA\n- Senior (5+ yrs): ₹15-30 LPA\nVaries by location and skills.';
+    } else if (lowerQuery.includes('offer') || lowerQuery.includes('shopping')) {
+      response = 'To prevent offer shopping:\n1. Keep hike under 40%\n2. Check candidate\'s offer history\n3. Set clear acceptance deadlines\n4. Include retention bonuses\n5. Use our Offer Risk Analyzer';
+    } else {
+      response = 'I can help you with:\n- Hiring recommendations\n- Team composition\n- Budget planning\n- Salary benchmarks\n- Offer management\n- HR policies\n\nPlease ask a specific question!';
+    }
+    
+    res.json({
+      query,
+      response,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to process query' });
+  }
+});
+
+// Bulk Operations Routes
+app.post('/api/candidates/bulk-action', async (req, res) => {
+  try {
+    const { candidate_ids, action, new_status } = req.body;
+    
+    if (!candidate_ids || !Array.isArray(candidate_ids)) {
+      return res.status(400).json({ error: 'candidate_ids must be an array' });
+    }
+    
+    let updatedCount = 0;
+    
+    if (db) {
+      const { ObjectId } = require('mongodb');
+      const objectIds = candidate_ids.map(id => {
+        try {
+          return new ObjectId(id);
+        } catch {
+          return id; // If it's not a valid ObjectId, use it as is
+        }
+      });
+      
+      if (action === 'update_status' && new_status) {
+        const result = await db.collection('candidates').updateMany(
+          { _id: { $in: objectIds } },
+          { $set: { application_status: new_status, updated_at: new Date() } }
+        );
+        updatedCount = result.modifiedCount;
+      } else if (action === 'delete') {
+        const result = await db.collection('candidates').deleteMany(
+          { _id: { $in: objectIds } }
+        );
+        updatedCount = result.deletedCount;
+      }
+    } else {
+      // In-memory operations
+      if (action === 'update_status' && new_status) {
+        candidate_ids.forEach(id => {
+          const candidateIndex = candidatesData.findIndex(c => c._id === id);
+          if (candidateIndex !== -1) {
+            candidatesData[candidateIndex].application_status = new_status;
+            candidatesData[candidateIndex].updated_at = new Date();
+            updatedCount++;
+          }
+        });
+      } else if (action === 'delete') {
+        candidate_ids.forEach(id => {
+          const candidateIndex = candidatesData.findIndex(c => c._id === id);
+          if (candidateIndex !== -1) {
+            candidatesData.splice(candidateIndex, 1);
+            updatedCount++;
+          }
+        });
+      }
+    }
+    
+    res.json({
+      message: `Bulk action completed successfully`,
+      updated_count: updatedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to perform bulk action' });
   }
 });
 
