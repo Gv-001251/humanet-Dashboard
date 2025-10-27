@@ -2,16 +2,12 @@ import React from 'react';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 export const Header: React.FC = () => {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
-
-  const notifications = [
-    { id: 1, message: 'New candidate shortlisted: John Doe', time: '2m ago' },
-    { id: 2, message: 'Interview scheduled with Sarah Lee', time: '1h ago' },
-    { id: 3, message: 'Offer sent to Michael Chen', time: '3h ago' }
-  ];
 
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
@@ -22,12 +18,14 @@ export const Header: React.FC = () => {
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate('/messages')}
-          className="relative p-2 rounded-full hover:bg-gray-100"
+          className="relative p-2 rounded-full hover:bg-gray-100 transition-all group"
         >
-          <Bell className="w-6 h-6 text-gray-600" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
-            {notifications.length}
-          </span>
+          <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-blue-600' : 'text-gray-600'} group-hover:scale-110 transition-transform`} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow-lg animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
         <div className="flex items-center space-x-2">
           <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
