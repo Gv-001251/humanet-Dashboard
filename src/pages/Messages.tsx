@@ -3,6 +3,7 @@ import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/common/Button';
 import { Mail, Check, Bell, Send, Inbox, CheckCircle2, Clock } from 'lucide-react';
 import { messagesService, MessageNotification } from '../services/messagesService';
+import { useNotifications } from '../contexts/NotificationContext';
 
 type StatusMessage = {
   type: 'success' | 'error';
@@ -72,6 +73,7 @@ const formatTimestamp = (timestamp: string) => {
 };
 
 export const Messages: React.FC = () => {
+  const { syncNotifications } = useNotifications();
   const [notifications, setNotifications] = useState<MessageNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
@@ -99,17 +101,20 @@ export const Messages: React.FC = () => {
         }));
 
         setNotifications(normalised);
+        syncNotifications(normalised);
       } else {
         setNotifications([]);
+        syncNotifications([]);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setStatusMessage({ type: 'error', text: 'Unable to load notifications from the server. Showing recent local updates instead.' });
       setNotifications(FALLBACK_NOTIFICATIONS);
+      syncNotifications(FALLBACK_NOTIFICATIONS);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncNotifications]);
 
   useEffect(() => {
     fetchNotifications();
@@ -127,9 +132,9 @@ export const Messages: React.FC = () => {
   const handleMarkAsRead = async (id: string) => {
     try {
       await messagesService.markAsRead(id);
-      setNotifications(prev =>
-        prev.map(notif => (notif.id === id ? { ...notif, read: true } : notif))
-      );
+      const updated = notifications.map(notif => (notif.id === id ? { ...notif, read: true } : notif));
+      setNotifications(updated);
+      syncNotifications(updated);
     } catch (error) {
       console.error('Error marking notification as read:', error);
       setStatusMessage({ type: 'error', text: 'Unable to update notification state. Please try again.' });
@@ -145,7 +150,9 @@ export const Messages: React.FC = () => {
     try {
       setMarkingAll(true);
       await Promise.all(unread.map(notification => messagesService.markAsRead(notification.id)));
-      setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+      const updated = notifications.map(notif => ({ ...notif, read: true }));
+      setNotifications(updated);
+      syncNotifications(updated);
       setStatusMessage({ type: 'success', text: 'All notifications marked as read.' });
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
