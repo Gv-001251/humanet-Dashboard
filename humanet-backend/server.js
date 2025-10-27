@@ -128,7 +128,104 @@ let employees = [
   }
 ];
 
-let projects = [];
+let projects = [
+  {
+    id: 'proj-1',
+    title: 'E-commerce Platform Revamp',
+    description: 'Modernize the existing e-commerce platform with React and microservices',
+    requiredSkills: ['React', 'Node.js', 'MongoDB', 'AWS'],
+    experience: { min: 3, max: 7 },
+    teamSize: 5,
+    timeline: '6 months',
+    progress: 65,
+    assignedEmployees: ['emp-1', 'emp-2'],
+    createdAt: new Date('2024-01-10')
+  },
+  {
+    id: 'proj-2',
+    title: 'AI-Powered Analytics Dashboard',
+    description: 'Build an AI-powered analytics dashboard for real-time data insights',
+    requiredSkills: ['Python', 'TensorFlow', 'React', 'Data Analysis'],
+    experience: { min: 4, max: 8 },
+    teamSize: 4,
+    timeline: '8 months',
+    progress: 100,
+    assignedEmployees: ['emp-3'],
+    createdAt: new Date('2023-10-15')
+  },
+  {
+    id: 'proj-3',
+    title: 'Mobile App Development',
+    description: 'Native mobile application for iOS and Android',
+    requiredSkills: ['React Native', 'TypeScript', 'Mobile Development'],
+    experience: { min: 3, max: 6 },
+    teamSize: 3,
+    timeline: '5 months',
+    progress: 0,
+    assignedEmployees: [],
+    createdAt: new Date('2024-02-01')
+  },
+  {
+    id: 'proj-4',
+    title: 'Customer Portal Enhancement',
+    description: 'Enhance customer portal with new features and improved UX',
+    requiredSkills: ['React', 'TypeScript', 'UI/UX', 'GraphQL'],
+    experience: { min: 2, max: 5 },
+    teamSize: 3,
+    timeline: '4 months',
+    progress: 35,
+    assignedEmployees: ['emp-1'],
+    createdAt: new Date('2024-01-20')
+  },
+  {
+    id: 'proj-5',
+    title: 'Microservices Migration',
+    description: 'Migrate monolithic application to microservices architecture',
+    requiredSkills: ['Node.js', 'Docker', 'Kubernetes', 'AWS'],
+    experience: { min: 5, max: 10 },
+    teamSize: 6,
+    timeline: '12 months',
+    progress: 0,
+    assignedEmployees: [],
+    createdAt: new Date('2024-02-05')
+  },
+  {
+    id: 'proj-6',
+    title: 'Security Audit and Enhancement',
+    description: 'Comprehensive security audit and implementation of best practices',
+    requiredSkills: ['Security', 'DevOps', 'Networking'],
+    experience: { min: 4, max: 8 },
+    teamSize: 2,
+    timeline: '3 months',
+    progress: 100,
+    assignedEmployees: [],
+    createdAt: new Date('2023-11-01')
+  },
+  {
+    id: 'proj-7',
+    title: 'Data Warehouse Implementation',
+    description: 'Build and deploy a scalable data warehouse solution',
+    requiredSkills: ['SQL', 'Data Engineering', 'ETL', 'Python'],
+    experience: { min: 4, max: 7 },
+    teamSize: 4,
+    timeline: '7 months',
+    progress: 80,
+    assignedEmployees: ['emp-3'],
+    createdAt: new Date('2023-12-01')
+  },
+  {
+    id: 'proj-8',
+    title: 'Marketing Website Redesign',
+    description: 'Complete redesign of the marketing website with modern stack',
+    requiredSkills: ['React', 'Next.js', 'Tailwind CSS', 'SEO'],
+    experience: { min: 2, max: 5 },
+    teamSize: 3,
+    timeline: '3 months',
+    progress: 50,
+    assignedEmployees: ['emp-1'],
+    createdAt: new Date('2024-01-05')
+  }
+];
 let projectAssignments = [];
 let salaryPredictions = [];
 let notifications = [];
@@ -461,12 +558,19 @@ app.delete('/api/salary/:id', authenticate, (req, res) => {
 });
 
 app.get('/api/analytics/overview', authenticate, (req, res) => {
+  const now = new Date();
+  const activeProjectsCount = projects.filter(project => project.progress > 0 && project.progress < 100).length;
+
   res.json({
     success: true,
     data: {
       totalEmployees: employees.length,
-      activeProjects: projects.length,
-      hiringThisMonth: candidates.filter(c => c.createdAt && new Date(c.createdAt).getMonth() === new Date().getMonth()).length,
+      activeProjects: activeProjectsCount,
+      hiringThisMonth: candidates.filter(c => {
+        if (!c.createdAt) return false;
+        const createdAt = new Date(c.createdAt);
+        return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+      }).length,
       avgTimeToHire: 18
     }
   });
