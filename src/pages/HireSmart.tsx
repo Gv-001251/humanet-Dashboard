@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
-import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 
 interface Candidate {
@@ -23,8 +23,46 @@ export const HireSmart: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [atsThreshold, setAtsThreshold] = useState(70);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
+
+  const fetchCandidates = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch candidates');
+
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        const parsedCandidates: Candidate[] = data.data.map((candidate: any): Candidate => ({
+          id: String(candidate.id ?? candidate._id ?? `cand-${Date.now()}`),
+          name: candidate.name ?? 'Unknown Candidate',
+          email: candidate.email ?? 'unknown@example.com',
+          phone: candidate.phone ?? '+91 9876543210',
+          skills: Array.isArray(candidate.skills) ? candidate.skills : [],
+          experience: Number(candidate.experience ?? candidate.experience_years ?? 0),
+          ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
+          location: candidate.location ?? 'Bangalore',
+          domain: candidate.domain ?? 'General',
+          atsScore: Number(candidate.atsScore ?? candidate.ats_score ?? 60),
+          status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
+          education: candidate.education ?? 'Not specified'
+        }));
+        setCandidates(parsedCandidates);
+      }
+    } catch (error) {
+      console.error('Error fetching candidates:', error);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -94,10 +132,93 @@ export const HireSmart: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = (candidateId: string, newStatus: 'shortlisted' | 'rejected') => {
-    setCandidates(prev =>
-      prev.map(c => (c.id === candidateId ? { ...c, status: newStatus } : c))
-    );
+  const handleStatusUpdate = async (candidateId: string, newStatus: 'shortlisted' | 'rejected') => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+
+      setCandidates(prev =>
+        prev.map(c => (c.id === candidateId ? { ...c, status: newStatus } : c))
+      );
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update candidate status');
+    }
+  };
+
+  const handleDeleteCandidate = async (candidateId: string) => {
+    if (!confirm('Are you sure you want to delete this candidate? This will also remove their resume file.')) {
+      return;
+    }
+
+    setDeletingCandidateId(candidateId);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete candidate');
+
+      setCandidates(prev => prev.filter(c => c.id !== candidateId));
+      if (selectedCandidate?.id === candidateId) {
+        setSelectedCandidate(null);
+      }
+    } catch (error) {
+      console.error('Error deleting candidate:', error);
+      alert('Failed to delete candidate');
+    } finally {
+      setDeletingCandidateId(null);
+    }
+  };
+
+  const handleDeleteAllCandidates = async () => {
+    if (!confirm(`Are you sure you want to delete all ${candidates.length} candidates? This will also remove all their resume files. This action cannot be undone.`)) {
+      return;
+    }
+
+    const candidateIds = [...candidates.map(c => c.id)];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const candidateId of candidateIds) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
+          }
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        console.error('Error deleting candidate:', error);
+        failCount++;
+      }
+    }
+
+    setCandidates([]);
+    setSelectedCandidate(null);
+    
+    if (failCount > 0) {
+      alert(`Deleted ${successCount} candidates. Failed to delete ${failCount} candidates.`);
+    } else {
+      alert(`Successfully deleted all ${successCount} candidates.`);
+    }
   };
 
   const filteredCandidates = candidates.filter(c => {
@@ -121,14 +242,26 @@ export const HireSmart: React.FC = () => {
             <h1 className="text-3xl font-bold">HireSmart</h1>
             <p className="text-gray-600 mt-1">Resume parsing & ATS scoring</p>
           </div>
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            variant="primary"
-            isLoading={isUploading}
-          >
-            <Upload className="w-5 h-5 mr-2" />
-            Upload Resumes
-          </Button>
+          <div className="flex items-center space-x-3">
+            {candidates.length > 0 && (
+              <Button
+                onClick={handleDeleteAllCandidates}
+                variant="outline"
+                className="text-red-600 border-red-300 hover:bg-red-50"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
+                Delete All ({candidates.length})
+              </Button>
+            )}
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              variant="primary"
+              isLoading={isUploading}
+            >
+              <Upload className="w-5 h-5 mr-2" />
+              Upload Resumes
+            </Button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -195,77 +328,100 @@ export const HireSmart: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCandidates.map(candidate => (
-              <div key={candidate.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
-                    <p className="text-sm text-gray-600">{candidate.domain}</p>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-sm font-semibold ${getScoreColor(candidate.atsScore)}`}>
-                    {candidate.atsScore}%
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-sm text-gray-600 mb-4">
-                  <p><strong>Experience:</strong> {candidate.experience} years</p>
-                  <p><strong>CTC:</strong> ₹{(candidate.ctc / 100000).toFixed(1)}L</p>
-                  <p><strong>Location:</strong> {candidate.location}</p>
-                  <p><strong>Email:</strong> {candidate.email}</p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Skills:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {candidate.skills.map((skill, idx) => (
-                      <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => setSelectedCandidate(candidate)}
-                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>View</span>
-                  </button>
-                  {candidate.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => handleStatusUpdate(candidate.id, 'shortlisted')}
-                        className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Shortlist</span>
-                      </button>
-                      <button
-                        onClick={() => handleStatusUpdate(candidate.id, 'rejected')}
-                        className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>Reject</span>
-                      </button>
-                    </>
-                  )}
-                  {candidate.status === 'shortlisted' && (
-                    <div className="flex-1 flex items-center justify-center px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-semibold">
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Shortlisted
+            {filteredCandidates.map(candidate => {
+              const isDeletingCandidate = deletingCandidateId === candidate.id;
+              return (
+                <div key={candidate.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
+                      <p className="text-sm text-gray-600">{candidate.domain}</p>
                     </div>
-                  )}
-                  {candidate.status === 'rejected' && (
-                    <div className="flex-1 flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-semibold">
-                      <XCircle className="w-4 h-4 mr-1" />
-                      Rejected
+                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${getScoreColor(candidate.atsScore)}`}>
+                      {candidate.atsScore}%
                     </div>
-                  )}
+                  </div>
+
+                  <div className="space-y-2 text-sm text-gray-600 mb-4">
+                    <p><strong>Experience:</strong> {candidate.experience} years</p>
+                    <p><strong>CTC:</strong> ₹{(candidate.ctc / 100000).toFixed(1)}L</p>
+                    <p><strong>Location:</strong> {candidate.location}</p>
+                    <p><strong>Email:</strong> {candidate.email}</p>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Skills:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {candidate.skills.map((skill, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setSelectedCandidate(candidate)}
+                      className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View</span>
+                    </button>
+                    {candidate.status === 'pending' ? (
+                      <>
+                        <button
+                          onClick={() => handleStatusUpdate(candidate.id, 'shortlisted')}
+                          className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Shortlist</span>
+                        </button>
+                        <button
+                          onClick={() => handleStatusUpdate(candidate.id, 'rejected')}
+                          className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>Reject</span>
+                        </button>
+                      </>
+                    ) : (
+                      <div
+                        className={`flex-1 flex items-center justify-center px-3 py-2 rounded-lg text-sm font-semibold ${
+                          candidate.status === 'shortlisted'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {candidate.status === 'shortlisted' ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Shortlisted
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Rejected
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleDeleteCandidate(candidate.id)}
+                      disabled={isDeletingCandidate}
+                      className={`flex items-center justify-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                        isDeletingCandidate
+                          ? 'bg-red-100 text-red-500 border-red-200 cursor-not-allowed'
+                          : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+                      }`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{isDeletingCandidate ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
