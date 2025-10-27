@@ -7,20 +7,28 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
 
+const uploadsDir = path.join(__dirname, 'uploads');
+const MAX_RESUME_COUNT = 3;
+
+const ensureUploadsDirExists = () => {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+};
+
+ensureUploadsDirExists();
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    ensureUploadsDirExists();
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -37,7 +45,57 @@ let users = [
   { id: 'user5', email: 'investor@humanet.com', password: 'investor123', name: 'Nisha Patel', role: 'investor' }
 ];
 
-let candidates = [];
+let candidates = [
+  {
+    id: 'cand-1',
+    name: 'Amit Kumar',
+    email: 'amit.kumar@example.com',
+    phone: '+91 9876543210',
+    skills: ['React', 'TypeScript', 'JavaScript', 'Node.js'],
+    experience: 5,
+    ctc: 1200000,
+    location: 'Bangalore',
+    domain: 'Frontend',
+    atsScore: 85,
+    status: 'pending',
+    education: 'B.Tech Computer Science',
+    resumeUrl: '/uploads/resume-amit-kumar.pdf',
+    createdAt: new Date('2024-01-15')
+  },
+  {
+    id: 'cand-2',
+    name: 'Sneha Reddy',
+    email: 'sneha.reddy@example.com',
+    phone: '+91 9876543211',
+    skills: ['Python', 'Machine Learning', 'AI', 'TensorFlow'],
+    experience: 4,
+    ctc: 1500000,
+    location: 'Hyderabad',
+    domain: 'Data Science',
+    atsScore: 92,
+    status: 'pending',
+    education: 'M.Tech Data Science',
+    resumeUrl: '/uploads/resume-sneha-reddy.pdf',
+    createdAt: new Date('2024-01-16')
+  },
+  {
+    id: 'cand-3',
+    name: 'Vikram Patel',
+    email: 'vikram.patel@example.com',
+    phone: '+91 9876543212',
+    skills: ['Node.js', 'React', 'MongoDB', 'AWS', 'Docker'],
+    experience: 6,
+    ctc: 1800000,
+    location: 'Mumbai',
+    domain: 'Full Stack',
+    atsScore: 88,
+    status: 'pending',
+    education: 'B.E. Software Engineering',
+    resumeUrl: '/uploads/resume-vikram-patel.pdf',
+    createdAt: new Date('2024-01-17')
+  }
+];
+
 let employees = [
   {
     id: 'emp-1',
@@ -89,6 +147,69 @@ let companySettings = {
   atsThreshold: 75,
   skillsKeywords: ['React', 'Node.js', 'Python', 'Data Science', 'Leadership']
 };
+
+const resolveResumeFilePath = resumeUrl => {
+  if (!resumeUrl) {
+    return null;
+  }
+
+  const relativePath = resumeUrl.replace(/^\/+/, '');
+  if (!relativePath.startsWith('uploads')) {
+    return null;
+  }
+
+  const filePath = path.normalize(path.join(__dirname, relativePath));
+  if (!filePath.startsWith(uploadsDir)) {
+    return null;
+  }
+
+  return filePath;
+};
+
+const deleteResumeFile = resumeUrl => {
+  const filePath = resolveResumeFilePath(resumeUrl);
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (err) {
+    console.warn(`Failed to delete resume file at ${filePath}:`, err.message);
+  }
+};
+
+const cleanupOldResumes = () => {
+  if (candidates.length <= MAX_RESUME_COUNT) {
+    return;
+  }
+
+  const getTimestamp = candidate => {
+    if (!candidate || !candidate.createdAt) {
+      return 0;
+    }
+
+    if (candidate.createdAt instanceof Date) {
+      return candidate.createdAt.getTime();
+    }
+
+    const parsedDate = new Date(candidate.createdAt);
+    return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
+  };
+
+  const sortedCandidates = [...candidates].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+  const candidatesToKeep = sortedCandidates.slice(0, MAX_RESUME_COUNT);
+  const keepIds = new Set(candidatesToKeep.map(candidate => candidate.id));
+  const candidatesToRemove = candidates.filter(candidate => !keepIds.has(candidate.id));
+
+  candidatesToRemove.forEach(candidate => deleteResumeFile(candidate?.resumeUrl));
+
+  candidates = candidatesToKeep;
+};
+
+cleanupOldResumes();
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -172,7 +293,12 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
       parsedCandidates.push(candidate);
     }
 
-    res.json({ success: true, data: parsedCandidates });
+    cleanupOldResumes();
+
+    const remainingCandidateIds = new Set(candidates.map(candidate => candidate.id));
+    const responseCandidates = parsedCandidates.filter(candidate => remainingCandidateIds.has(candidate.id));
+
+    res.json({ success: true, data: responseCandidates });
   } catch (error) {
     console.error('Resume parsing error:', error);
     res.status(500).json({ success: false, message: 'Failed to process resumes' });
@@ -218,6 +344,10 @@ app.delete('/api/candidates/:id', authenticate, (req, res) => {
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'Candidate not found' });
   }
+  
+  const candidate = candidates[index];
+  deleteResumeFile(candidate?.resumeUrl);
+  
   candidates.splice(index, 1);
   res.json({ success: true, message: 'Candidate removed' });
 });
