@@ -76,11 +76,16 @@ export const Dashboard: React.FC = () => {
         }
 
         if (projectsRes.success) {
+          const planningCount = projectsRes.data.filter(p => p.progress === 0).length;
+          const activeCount = projectsRes.data.filter(p => p.progress > 0 && p.progress < 100).length;
+          const completedCount = projectsRes.data.filter(p => p.progress >= 100).length;
+          const onHoldCount = Math.max(0, projectsRes.data.length - planningCount - activeCount - completedCount);
+          
           const status = [
-            { name: 'Active', value: projectsRes.data.filter(p => p.progress < 100).length },
-            { name: 'Completed', value: projectsRes.data.filter(p => p.progress >= 100).length },
-            { name: 'On Hold', value: Math.max(0, projectsRes.data.length - 3) },
-            { name: 'Planning', value: Math.max(1, 3 - projectsRes.data.filter(p => p.progress >= 100).length) }
+            { name: 'Active', value: activeCount },
+            { name: 'Completed', value: completedCount },
+            { name: 'On Hold', value: onHoldCount },
+            { name: 'Planning', value: planningCount }
           ];
           setProjectStatusData(status);
         }
