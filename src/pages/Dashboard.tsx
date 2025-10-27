@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
-import { Users, Briefcase, TrendingUp, Clock, DollarSign } from 'lucide-react';
+import { Users, Briefcase, TrendingUp, Clock, DollarSign, Activity, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export const Dashboard: React.FC = () => {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalEmployees: 0,
     activeProjects: 0,
@@ -57,6 +58,7 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        setLoading(true);
         const [overviewRes, funnelRes, projectsRes, employeesRes, activitiesRes] = await Promise.all([
           api.get<{ success: boolean; data: typeof stats }>("/analytics/overview"),
           api.get<{ success: boolean; data: { stage: string; count: number }[] }>("/analytics/hiring-funnel"),
@@ -103,79 +105,126 @@ export const Dashboard: React.FC = () => {
         }
       } catch (error) {
         console.error('Error loading dashboard analytics', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchDashboardData();
   }, []);
 
-  const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-    <div className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${color}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-500 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
-        </div>
-        <div className={`p-3 rounded-full ${color.replace('border-', 'bg-').replace('-500', '-100')}`}>
+  const StatCard: React.FC<{ 
+    title: string; 
+    value: string | number; 
+    icon: React.ReactNode; 
+    color: string;
+    trend?: { value: number; isUp: boolean };
+  }> = ({ title, value, icon, color, trend }) => (
+    <div className={`bg-gradient-to-br ${color} rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 border border-gray-100`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="p-3 rounded-xl bg-white bg-opacity-90 shadow-md">
           {icon}
         </div>
+        {trend && (
+          <div className={`flex items-center text-sm font-semibold ${trend.isUp ? 'text-green-600' : 'text-red-600'}`}>
+            {trend.isUp ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
+            {trend.value}%
+          </div>
+        )}
       </div>
+      <div>
+        <p className="text-gray-600 text-sm font-medium mb-1">{title}</p>
+        <p className="text-4xl font-bold text-gray-800">{value}</p>
+      </div>
+    </div>
+  );
+
+  const SkeletonCard = () => (
+    <div className="bg-white rounded-xl shadow-md p-6 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+      <div className="h-8 bg-gray-200 rounded w-3/4"></div>
     </div>
   );
 
   return (
     <Layout>
-      <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <div className="p-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
+          <p className="text-gray-600 flex items-center">
+            <Activity className="w-4 h-4 mr-2" />
+            Real-time insights into your organization's performance
+          </p>
+        </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            title="Total Employees"
-            value={stats.totalEmployees || 81}
-            icon={<Users className="w-8 h-8 text-blue-500" />}
-            color="border-blue-500"
-          />
-          <StatCard
-            title="Active Projects"
-            value={stats.activeProjects || 28}
-            icon={<Briefcase className="w-8 h-8 text-green-500" />}
-            color="border-green-500"
-          />
-          <StatCard
-            title="Hiring This Month"
-            value={stats.hiringThisMonth || 15}
-            icon={<TrendingUp className="w-8 h-8 text-orange-500" />}
-            color="border-orange-500"
-          />
-          <StatCard
-            title="Avg Time-to-Hire"
-            value={`${stats.avgTimeToHire || 18} days`}
-            icon={<Clock className="w-8 h-8 text-purple-500" />}
-            color="border-purple-500"
-          />
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              title="Total Employees"
+              value={stats.totalEmployees || 81}
+              icon={<Users className="w-8 h-8 text-blue-600" />}
+              color="from-blue-50 to-blue-100"
+              trend={{ value: 12, isUp: true }}
+            />
+            <StatCard
+              title="Active Projects"
+              value={stats.activeProjects || 28}
+              icon={<Briefcase className="w-8 h-8 text-green-600" />}
+              color="from-green-50 to-green-100"
+              trend={{ value: 8, isUp: true }}
+            />
+            <StatCard
+              title="Hiring This Month"
+              value={stats.hiringThisMonth || 15}
+              icon={<TrendingUp className="w-8 h-8 text-orange-600" />}
+              color="from-orange-50 to-orange-100"
+              trend={{ value: 5, isUp: false }}
+            />
+            <StatCard
+              title="Avg Time-to-Hire"
+              value={`${stats.avgTimeToHire || 18} days`}
+              icon={<Clock className="w-8 h-8 text-purple-600" />}
+              color="from-purple-50 to-purple-100"
+              trend={{ value: 3, isUp: false }}
+            />
+          </div>
+        )}
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Hiring Funnel */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Hiring Funnel</h2>
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
+            <div className="flex items-center mb-6">
+              <BarChart3 className="w-6 h-6 text-blue-600 mr-3" />
+              <h2 className="text-2xl font-bold text-gray-800">Hiring Funnel</h2>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={hiringFunnelData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="stage" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#3B82F6" />
+                <defs>
+                  <linearGradient id="colorBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.4}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="stage" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB' }}
+                  cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Bar dataKey="count" fill="url(#colorBar)" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Project Status */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Project Status</h2>
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Project Status Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -184,15 +233,17 @@ export const Dashboard: React.FC = () => {
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) => `${name}: ${(Number(percent) * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  outerRadius={90}
                   fill="#8884d8"
                   dataKey="value"
+                  paddingAngle={2}
                 >
                   {projectStatusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB' }} />
+                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -200,57 +251,87 @@ export const Dashboard: React.FC = () => {
 
         {/* Charts Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Employee Distribution */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Employee Distribution</h2>
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Department Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={employeeDistribution} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="department" width={100} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#10B981" />
+                <defs>
+                  <linearGradient id="colorGreen" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0.4}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <YAxis type="category" dataKey="department" width={120} tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB' }}
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.1)' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Bar dataKey="count" fill="url(#colorGreen)" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Salary Expenses */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <DollarSign className="w-5 h-5 mr-2" />
-              Salary Expenses (Monthly)
-            </h2>
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
+            <div className="flex items-center mb-6">
+              <DollarSign className="w-6 h-6 text-purple-600 mr-3" />
+              <h2 className="text-2xl font-bold text-gray-800">Salary Expenses Trend</h2>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={salaryExpenses}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value) => `₹${(value as number).toLocaleString()}`} />
-                <Legend />
-                <Line type="monotone" dataKey="amount" stroke="#8B5CF6" strokeWidth={2} />
+                <defs>
+                  <linearGradient id="colorPurple" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} />
+                <Tooltip 
+                  formatter={(value) => `₹${(value as number).toLocaleString()}`}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke="#8B5CF6" 
+                  strokeWidth={3}
+                  dot={{ fill: '#8B5CF6', r: 5 }}
+                  activeDot={{ r: 7 }}
+                  fill="url(#colorPurple)"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Recent Activity Feed */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-          <div className="space-y-4">
+        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 border border-gray-100">
+          <div className="flex items-center mb-6">
+            <Activity className="w-6 h-6 text-gray-700 mr-3" />
+            <h2 className="text-2xl font-bold text-gray-800">Recent Activity</h2>
+          </div>
+          <div className="space-y-3">
             {recentActivities.map(activity => (
-              <div key={activity.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
+              <div 
+                key={activity.id} 
+                className="flex items-center justify-between py-4 px-4 border-b last:border-b-0 hover:bg-gray-50 rounded-lg transition-colors duration-200"
+              >
                 <div className="flex items-center">
-                  <div className={`w-2 h-2 rounded-full mr-3 ${
+                  <div className={`w-3 h-3 rounded-full mr-4 shadow-md ${
                     activity.type === 'candidate' ? 'bg-blue-500' :
                     activity.type === 'project' ? 'bg-green-500' :
                     activity.type === 'offer' ? 'bg-orange-500' :
                     activity.type === 'employee' ? 'bg-purple-500' :
                     'bg-gray-500'
                   }`}></div>
-                  <span className="text-gray-700">{activity.text}</span>
+                  <span className="text-gray-800 font-medium">{activity.text}</span>
                 </div>
-                <span className="text-sm text-gray-500">{activity.time}</span>
+                <span className="text-sm text-gray-500 font-medium">{activity.time}</span>
               </div>
             ))}
           </div>
