@@ -8,7 +8,6 @@ const mammoth = require('mammoth');
 require('dotenv').config();
 
 const uploadsDir = path.join(__dirname, 'uploads');
-const MAX_RESUME_COUNT = 3;
 
 const ensureUploadsDirExists = () => {
   if (!fs.existsSync(uploadsDir)) {
@@ -181,36 +180,6 @@ const deleteResumeFile = resumeUrl => {
   }
 };
 
-const cleanupOldResumes = () => {
-  if (candidates.length <= MAX_RESUME_COUNT) {
-    return;
-  }
-
-  const getTimestamp = candidate => {
-    if (!candidate || !candidate.createdAt) {
-      return 0;
-    }
-
-    if (candidate.createdAt instanceof Date) {
-      return candidate.createdAt.getTime();
-    }
-
-    const parsedDate = new Date(candidate.createdAt);
-    return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
-  };
-
-  const sortedCandidates = [...candidates].sort((a, b) => getTimestamp(b) - getTimestamp(a));
-  const candidatesToKeep = sortedCandidates.slice(0, MAX_RESUME_COUNT);
-  const keepIds = new Set(candidatesToKeep.map(candidate => candidate.id));
-  const candidatesToRemove = candidates.filter(candidate => !keepIds.has(candidate.id));
-
-  candidatesToRemove.forEach(candidate => deleteResumeFile(candidate?.resumeUrl));
-
-  candidates = candidatesToKeep;
-};
-
-cleanupOldResumes();
-
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -293,12 +262,7 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
       parsedCandidates.push(candidate);
     }
 
-    cleanupOldResumes();
-
-    const remainingCandidateIds = new Set(candidates.map(candidate => candidate.id));
-    const responseCandidates = parsedCandidates.filter(candidate => remainingCandidateIds.has(candidate.id));
-
-    res.json({ success: true, data: responseCandidates });
+    res.json({ success: true, data: parsedCandidates });
   } catch (error) {
     console.error('Resume parsing error:', error);
     res.status(500).json({ success: false, message: 'Failed to process resumes' });
