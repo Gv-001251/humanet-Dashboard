@@ -51,3 +51,11 @@ export const api = {
     method: 'DELETE'
   })
 };
+
+export const employeeAPI = {
+  getAll: () => api.get<{ success: boolean; data: any[] }>('/employees'),
+  getById: (id: string) => api.get<{ success: boolean; data: any }>(`/employees/${id}`),
+  create: (data: any) => api.post<{ success: boolean; data: any }>('/employees', data),
+  update: (id: string, data: any) => api.put<{ success: boolean; data: any }>(`/employees/${id}`, data),
+  delete: (id: string) => api.delete<{ success: boolean; message: string }>(`/employees/${id}`)
+};
