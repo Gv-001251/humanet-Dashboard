@@ -70,7 +70,6 @@ let candidates = [
     ctc: 1200000,
     location: 'Bangalore',
     domain: 'Frontend',
-    atsScore: 85,
     status: 'pending',
     education: 'B.Tech Computer Science',
     resumeUrl: '/uploads/resume-amit-kumar.pdf',
@@ -86,7 +85,6 @@ let candidates = [
     ctc: 1500000,
     location: 'Hyderabad',
     domain: 'Data Science',
-    atsScore: 92,
     status: 'pending',
     education: 'M.Tech Data Science',
     resumeUrl: '/uploads/resume-sneha-reddy.pdf',
@@ -102,7 +100,6 @@ let candidates = [
     ctc: 1800000,
     location: 'Mumbai',
     domain: 'Full Stack',
-    atsScore: 88,
     status: 'pending',
     education: 'B.E. Software Engineering',
     resumeUrl: '/uploads/resume-vikram-patel.pdf',
@@ -1263,7 +1260,6 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
             const ctcValue = getRowValue('ctc', 'expected ctc', 'current ctc', 'salary');
             const locationValue = getRowValue('location', 'city', 'base location');
             const domainValue = getRowValue('domain', 'role', 'position', 'job title');
-            const atsValue = getRowValue('ats score', 'atsscore', 'ats_score', 'score');
             const educationValue = getRowValue('education', 'qualification', 'degree');
 
             const skillsArray = skillsField
@@ -1272,7 +1268,6 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
 
             const experienceNumber = parseFloat(experienceValue);
             const ctcNumber = parseFloat(ctcValue);
-            const atsNumber = parseFloat(atsValue);
 
             const candidate = {
               id: `cand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1284,7 +1279,6 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
               ctc: Number.isFinite(ctcNumber) ? Math.max(0, Math.round(ctcNumber)) : Math.floor(Math.random() * 1000000) + 500000,
               location: locationValue || ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
               domain: domainValue || ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
-              atsScore: Number.isFinite(atsNumber) ? Math.max(0, Math.min(100, Math.round(atsNumber))) : Math.floor(Math.random() * 40) + 60,
               status: 'pending',
               education: educationValue || 'B.Tech Computer Science',
               resumeUrl: `/uploads/${file.filename}`,
@@ -1323,7 +1317,6 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
           ctc: Math.floor(Math.random() * 1000000) + 500000,
           location: ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
           domain: ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
-          atsScore: Math.floor(Math.random() * 40) + 60,
           status: 'pending',
           education: 'B.Tech Computer Science',
           resumeUrl: `/uploads/${file.filename}`,
