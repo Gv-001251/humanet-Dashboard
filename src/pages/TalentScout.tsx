@@ -74,7 +74,6 @@ export const TalentScout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [enableSalaryFilter, setEnableSalaryFilter] = useState(false);
 
   useEffect(() => {
     loadSavedCandidates();
@@ -372,6 +371,21 @@ export const TalentScout: React.FC = () => {
             </div>
           </div>
 
+          {typeof candidate.experienceProbability === 'number' && candidate.experienceRangeMatch && (
+            <div className="mb-4 p-3 border border-indigo-100 rounded-lg bg-indigo-50">
+              <div className="flex items-center justify-between text-sm font-semibold text-indigo-700">
+                <div className="flex items-center space-x-2">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Experience fit probability</span>
+                </div>
+                <span>{candidate.experienceProbability}%</span>
+              </div>
+              <p className="text-xs text-indigo-600 mt-1">
+                Aligns with the expected range of {candidate.experienceRangeMatch.min} - {candidate.experienceRangeMatch.max} years for this salary band.
+              </p>
+            </div>
+          )}
+
           {/* Bio Section */}
           {candidate.bio && (
             <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
@@ -539,7 +553,7 @@ export const TalentScout: React.FC = () => {
                 <h2 className="text-lg font-bold text-gray-900">Search Filters</h2>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Platform
@@ -588,41 +602,6 @@ export const TalentScout: React.FC = () => {
                     placeholder="e.g., Bangalore"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Experience (years)
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      value={searchFilters.experience.min}
-                      onChange={e =>
-                        setSearchFilters(prev => ({
-                          ...prev,
-                          experience: { ...prev.experience, min: Number(e.target.value) }
-                        }))
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    <span className="text-gray-500 font-medium">to</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      value={searchFilters.experience.max}
-                      onChange={e =>
-                        setSearchFilters(prev => ({
-                          ...prev,
-                          experience: { ...prev.experience, max: Number(e.target.value) }
-                        }))
-                      }
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -677,8 +656,6 @@ export const TalentScout: React.FC = () => {
               <SalaryFilterSection
                 searchFilters={searchFilters}
                 setSearchFilters={setSearchFilters}
-                enableSalaryFilter={enableSalaryFilter}
-                setEnableSalaryFilter={setEnableSalaryFilter}
               />
 
               <Button

@@ -53,6 +53,26 @@ export interface SalaryInsights {
   recommendation: string;
 }
 
+export interface ExperienceProbability {
+  experience: {
+    min: number;
+    max: number;
+  };
+  experienceYears: number;
+  salaryRange: {
+    min: number;
+    max: number;
+  };
+  probability: number;
+}
+
+export interface ExperienceMapping {
+  min: number;
+  max: number;
+  confidence: number;
+  probabilities: ExperienceProbability[];
+}
+
 export interface ExternalCandidate {
   id: string;
   name: string;
@@ -79,6 +99,11 @@ export interface ExternalCandidate {
   profileImage?: string;
   invitedAt?: string | null;
   status: 'discovered' | 'invited' | 'applied' | 'rejected';
+  experienceProbability?: number | null;
+  experienceRangeMatch?: {
+    min: number;
+    max: number;
+  } | null;
 }
 
 export interface SearchFilters {
@@ -113,6 +138,7 @@ export interface SalarySummary {
   candidateCount: number;
   totalGenerated: number;
   marketComparisons: MarketComparison[];
+  experienceMapping?: ExperienceMapping | null;
   formatted: {
     averageExpectedCtc: string | null;
     medianExpectedCtc: string | null;

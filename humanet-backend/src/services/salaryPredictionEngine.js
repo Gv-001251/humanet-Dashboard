@@ -506,6 +506,144 @@ function checkSalaryFit(expectedSalary, budgetRange) {
 }
 
 /**
+ * Get experience range from salary range
+ * This function reverse-maps salary to experience using the base salary brackets
+ * 
+ * @param {Object} salaryRange - Salary range to map to experience
+ * @param {number} salaryRange.min - Minimum salary
+ * @param {number} salaryRange.max - Maximum salary
+ * @returns {Object} Experience range that typically corresponds to the salary
+ */
+function getExperienceFromSalary(salaryRange) {
+  if (!salaryRange || typeof salaryRange.min !== 'number' || typeof salaryRange.max !== 'number') {
+    return {
+      min: 0,
+      max: 15,
+      confidence: 40,
+      probabilities: []
+    };
+  }
+
+  const budgetMin = Math.max(0, Math.min(salaryRange.min, salaryRange.max));
+  const budgetMax = Math.max(budgetMin, Math.max(salaryRange.min, salaryRange.max));
+  const budgetWidth = Math.max(budgetMax - budgetMin, 1);
+  const budgetAverage = (budgetMin + budgetMax) / 2 || 1;
+
+  const brackets = Object.keys(BASE_SALARY_BY_EXPERIENCE)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const probabilityEntries = brackets.map((experienceYears, index) => {
+    const salaryData = BASE_SALARY_BY_EXPERIENCE[experienceYears];
+    const nextExperience = index < brackets.length - 1 ? brackets[index + 1] : experienceYears + 5;
+
+    const bracketMinSalary = salaryData.min;
+    const bracketMaxSalary = salaryData.max;
+    const bracketWidth = Math.max(bracketMaxSalary - bracketMinSalary, 1);
+    const bracketAverage = (bracketMinSalary + bracketMaxSalary) / 2;
+
+    const overlap = Math.max(0, Math.min(budgetMax, bracketMaxSalary) - Math.max(budgetMin, bracketMinSalary));
+    const overlapRatioBudget = Math.min(1, overlap / budgetWidth);
+    const overlapRatioBracket = Math.min(1, overlap / bracketWidth);
+    const overlapScore = overlap > 0 ? (overlapRatioBudget + overlapRatioBracket) / 2 : 0;
+
+    const averageDifference = Math.abs(bracketAverage - budgetAverage);
+    const differenceScore = 1 / (1 + (averageDifference / Math.max(bracketAverage, 1)) * 3);
+
+    let boundaryDistance = 0;
+    if (budgetMax < bracketMinSalary) {
+      boundaryDistance = bracketMinSalary - budgetMax;
+    } else if (budgetMin > bracketMaxSalary) {
+      boundaryDistance = budgetMin - bracketMaxSalary;
+    }
+    const proximityScore = 1 / (1 + (boundaryDistance / Math.max(budgetWidth, 1)) * 2);
+
+    const score = 0.1 + overlapScore * 0.6 + differenceScore * 0.3 + proximityScore * 0.2;
+
+    return {
+      experienceYears,
+      range: {
+        min: experienceYears,
+        max: Math.max(experienceYears + 1, nextExperience)
+      },
+      salaryRange: salaryData,
+      overlap,
+      overlapScore,
+      differenceScore,
+      proximityScore,
+      score
+    };
+  });
+
+  const totalScore = probabilityEntries.reduce((sum, entry) => sum + entry.score, 0) || 1;
+
+  let probabilities = probabilityEntries.map(entry => ({
+    experience: entry.range,
+    experienceYears: entry.experienceYears,
+    salaryRange: entry.salaryRange,
+    probability: Math.round((entry.score / totalScore) * 100)
+  }));
+
+  // Adjust rounding to make sure total equals 100%
+  const totalProbability = probabilities.reduce((sum, entry) => sum + entry.probability, 0);
+  if (totalProbability !== 100 && probabilities.length > 0) {
+    const difference = 100 - totalProbability;
+    probabilities[0].probability = Math.max(0, Math.min(100, probabilities[0].probability + difference));
+  }
+
+  probabilities = probabilities
+    .sort((a, b) => b.probability - a.probability && b.experienceYears - a.experienceYears);
+
+  const topProbability = probabilities[0]?.probability ?? 40;
+  const relevantProbabilities = probabilities.filter(entry => entry.probability >= Math.max(15, topProbability * 0.6));
+
+  const minExperience = relevantProbabilities.length
+    ? Math.min(...relevantProbabilities.map(entry => entry.experience.min))
+    : probabilities[0]?.experience.min ?? 0;
+
+  const maxExperience = relevantProbabilities.length
+    ? Math.max(...relevantProbabilities.map(entry => entry.experience.max))
+    : probabilities[0]?.experience.max ?? 15;
+
+  const baseConfidence = calculateExperienceMappingConfidence({ min: budgetMin, max: budgetMax });
+  const combinedConfidence = Math.round((baseConfidence * 0.4) + (topProbability * 0.6));
+
+  return {
+    min: Math.max(0, Math.floor(minExperience)),
+    max: Math.max(Math.floor(minExperience) + 1, Math.ceil(maxExperience)),
+    confidence: Math.max(30, Math.min(100, combinedConfidence)),
+    probabilities
+  };
+}
+
+/**
+ * Calculate confidence level for salary-to-experience mapping
+ * Higher confidence when salary range is narrower and aligns with experience brackets
+ */
+function calculateExperienceMappingConfidence(salaryRange) {
+  const { min, max } = salaryRange;
+  const rangeSpan = Math.max(0, max - min);
+  const averageSalary = (Math.max(min, 0) + Math.max(max, 0)) / 2;
+  
+  // Narrower ranges get higher confidence
+  const rangeConfidence = averageSalary > 0
+    ? Math.max(0, 100 - Math.min(100, (rangeSpan / averageSalary) * 100))
+    : 50;
+  
+  // Check if the range aligns well with a specific experience bracket
+  let bracketAlignment = 50;
+  for (const salaryData of Object.values(BASE_SALARY_BY_EXPERIENCE)) {
+    const overlap = Math.max(0, Math.min(max, salaryData.max) - Math.max(min, salaryData.min));
+    if (overlap > 0 && rangeSpan > 0) {
+      const alignmentScore = Math.min(100, (overlap / rangeSpan) * 100);
+      bracketAlignment = Math.max(bracketAlignment, alignmentScore);
+    }
+  }
+  
+  return Math.round((rangeConfidence * 0.4 + bracketAlignment * 0.6));
+}
+
+/**
  * Format salary for display
  */
 function formatSalary(amount) {
@@ -524,9 +662,11 @@ module.exports = {
   getMarketComparison,
   checkSalaryFit,
   formatSalary,
+  getExperienceFromSalary,
   HIGH_DEMAND_SKILLS,
   LOCATION_MULTIPLIERS,
   INDUSTRY_MULTIPLIERS,
   COMPANY_SIZE_MULTIPLIERS,
-  ROLE_MULTIPLIERS
+  ROLE_MULTIPLIERS,
+  BASE_SALARY_BY_EXPERIENCE
 };
