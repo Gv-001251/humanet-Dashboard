@@ -6,12 +6,20 @@ const defaultHeaders = {
 };
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData;
+  const headers = isFormData
+    ? {
+        Accept: 'application/json',
+        ...(options.headers || {})
+      }
+    : {
+        ...defaultHeaders,
+        ...options.headers
+      };
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      ...defaultHeaders,
-      ...options.headers
-    },
-    ...options
+    ...options,
+    headers
   });
 
   if (!response.ok) {
@@ -36,10 +44,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   get: <T>(endpoint: string) => request<T>(endpoint),
-  post: <T>(endpoint: string, body?: unknown) => request<T>(endpoint, {
-    method: 'POST',
-    body: body ? JSON.stringify(body) : undefined
-  }),
+  post: <T>(endpoint: string, body?: unknown) => {
+    const isFormData = body instanceof FormData;
+    return request<T>(endpoint, {
+      method: 'POST',
+      body: isFormData ? body : (body ? JSON.stringify(body) : undefined)
+    });
+  },
   put: <T>(endpoint: string, body?: unknown) => request<T>(endpoint, {
     method: 'PUT',
     body: body ? JSON.stringify(body) : undefined

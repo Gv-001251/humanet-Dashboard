@@ -1842,10 +1842,7 @@ app.put('/api/settings/ats', (req, res) => {
   res.json({ success: true, data: { atsThreshold: companySettings.atsThreshold, skillsKeywords: companySettings.skillsKeywords } });
 });
 
-let externalCandidates = [];
-
-const AVAILABLE_AVAILABILITY_VALUES = ['Immediate', '15 Days', '1 Month'];
-const AVAILABLE_AVAILABILITY_STATUSES = new Set(AVAILABLE_AVAILABILITY_VALUES);
+let talentScoutProfiles = [];
 
 const calculateMatchScore = (candidate, searchFilters) => {
   let score = 0;
@@ -1856,7 +1853,7 @@ const calculateMatchScore = (candidate, searchFilters) => {
     const matchedSkills = requiredSkills.filter(skill => 
       candidateSkills.some(cs => cs.includes(skill) || skill.includes(cs))
     );
-    score += (matchedSkills.length / requiredSkills.length) * 60;
+    score += (matchedSkills.length / requiredSkills.length) * 70;
   } else {
     score += 50;
   }
@@ -1873,252 +1870,32 @@ const calculateMatchScore = (candidate, searchFilters) => {
     score += 10;
   }
 
-  if (
-    searchFilters.salaryBudget &&
-    candidate.salaryInsights &&
-    candidate.salaryInsights.salaryFit
-  ) {
-    const { status, fitPercentage } = candidate.salaryInsights.salaryFit;
-    const normalizedFit = Math.max(0, Math.min(120, fitPercentage));
-
-    if (status === 'perfect-match') {
-      score += 20;
-    } else if (status === 'below-budget') {
-      score += 15;
-    } else if (status === 'negotiable') {
-      score += 12;
+  const keywords = searchFilters.keywords.toLowerCase().split(/\s+/);
+  let keywordMatches = 0;
+  keywords.forEach(keyword => {
+    if (candidate.currentRole && candidate.currentRole.toLowerCase().includes(keyword)) {
+      keywordMatches++;
     }
-
-    score += Math.min(10, normalizedFit / 10);
+    if (candidate.bio && candidate.bio.toLowerCase().includes(keyword)) {
+      keywordMatches++;
+    }
+  });
+  if (keywordMatches > 0) {
+    score += Math.min(15, keywordMatches * 3);
   }
   
   return Math.min(Math.round(score), 100);
 };
 
-/**
- * Build salary insights for a candidate using the salary prediction engine
- */
-const buildSalaryInsights = (candidate, searchFilters) => {
-  const targetRole =
-    searchFilters.jobTitle ||
-    candidate.currentRole ||
-    searchFilters.keywords ||
-    'Software Engineer';
-  const targetIndustry = searchFilters.industry || 'IT/Tech';
-  const targetLocation = candidate.location || searchFilters.location || 'Bangalore';
-  const targetCompanySize = searchFilters.companySize || 'SME';
-
-  const prediction = predictSalary({
-    experience: candidate.experience,
-    role: targetRole,
-    location: targetLocation,
-    industry: targetIndustry,
-    skills: candidate.skills,
-    companySize: targetCompanySize
-  });
-
-  const baseAmount = prediction.salaryRange.average;
-  const variation = Math.random() * 0.25 - 0.1; // -10% to +15%
-  const expectedCtc = Math.max(
-    Math.round(baseAmount * (1 + variation)),
-    prediction.salaryRange.min
-  );
-
-  let salaryFit = null;
-  if (
-    searchFilters.salaryBudget &&
-    typeof searchFilters.salaryBudget.min === 'number' &&
-    typeof searchFilters.salaryBudget.max === 'number'
-  ) {
-    salaryFit = checkSalaryFit(expectedCtc, searchFilters.salaryBudget);
-  }
-
-  const marketComparisons = getMarketComparison({
-    experience: candidate.experience,
-    role: targetRole,
-    location: searchFilters.location || candidate.location || targetLocation,
-    industry: targetIndustry,
-    skills: candidate.skills,
-    companySize: targetCompanySize
-  }).map(entry => ({
-    label: entry.companySize || entry.location,
-    type: entry.companySize ? 'companySize' : 'location',
-    salaryRange: entry.salaryRange,
-    multiplier: entry.multiplier
-  }));
-
-  candidate.expectedCtc = expectedCtc;
-  candidate.salaryInsights = {
-    predictedRange: prediction.salaryRange,
-    breakdown: prediction.breakdown,
-    salaryFit,
-    marketComparisons,
-    formatted: {
-      predictedMin: formatSalary(prediction.salaryRange.min),
-      predictedMax: formatSalary(prediction.salaryRange.max),
-      predictedAverage: formatSalary(prediction.salaryRange.average),
-      expectedCtc: formatSalary(expectedCtc),
-      budgetMin: salaryFit?.budgetRange?.min ? formatSalary(salaryFit.budgetRange.min) : null,
-      budgetMax: salaryFit?.budgetRange?.max ? formatSalary(salaryFit.budgetRange.max) : null
-    },
-    summary: salaryFit ? salaryFit.message : 'No budget provided for salary matching',
-    recommendation: salaryFit
-      ? salaryFit.fits
-        ? 'Candidate expectation is within your budget range.'
-        : salaryFit.status === 'below-budget'
-          ? 'Candidate expects below your budget—consider increasing offer for retention.'
-          : salaryFit.status === 'negotiable'
-            ? 'Candidate slightly exceeds budget; consider negotiation or perks.'
-            : 'Candidate exceeds budget—requires approval to proceed.'
-      : 'Provide a salary budget to unlock fit analysis.'
-  };
-
-  if (salaryFit) {
-    candidate.salaryFitStatus = salaryFit.status;
-    candidate.salaryFitPercentage = salaryFit.fitPercentage;
-  }
-
-  return candidate;
-};
-
-const generateMockLinkedInCandidates = (filters, count = 5) => {
-  const names = [
-    'Rajesh Kumar', 'Priya Sharma', 'Amit Patel', 'Neha Singh', 'Vikram Reddy',
-    'Anjali Verma', 'Rahul Gupta', 'Sneha Desai', 'Karthik Iyer', 'Pooja Mehta',
-    'Arjun Nair', 'Divya Rao', 'Sanjay Joshi', 'Kavita Menon', 'Ravi Kumar'
-  ];
-  
-  const companies = ['Google', 'Amazon', 'Microsoft', 'TCS', 'Infosys', 'Wipro', 'Accenture', 'IBM', 'Oracle', 'SAP'];
-  const roles = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'Full Stack Developer', 'Frontend Engineer', 'Backend Developer', 'DevOps Engineer'];
-  const locations = ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune', 'Delhi', 'Chennai', 'Gurgaon', 'Noida'];
-  const educations = ['B.Tech Computer Science', 'M.Tech Software Engineering', 'B.E. Information Technology', 'MCA', 'B.Sc. Computer Science'];
-  
-  const allSkills = ['React', 'Node.js', 'Python', 'Java', 'AWS', 'Docker', 'Kubernetes', 'TypeScript', 'JavaScript', 'MongoDB', 'PostgreSQL', 'GraphQL', 'Redis', 'Microservices', 'CI/CD'];
-  
-  const results = [];
-  for (let i = 0; i < count; i++) {
-    const name = names[Math.floor(Math.random() * names.length)];
-    const experience = Math.floor(Math.random() * (filters.experience.max - filters.experience.min + 1)) + filters.experience.min;
-    
-    let candidateSkills = [...(filters.skills || [])];
-    const additionalSkills = allSkills.filter(s => !candidateSkills.includes(s));
-    const numAdditionalSkills = Math.floor(Math.random() * 5) + 2;
-    for (let j = 0; j < numAdditionalSkills; j++) {
-      const randomSkill = additionalSkills[Math.floor(Math.random() * additionalSkills.length)];
-      if (!candidateSkills.includes(randomSkill)) {
-        candidateSkills.push(randomSkill);
-      }
-    }
-    
-    const selectedRole =
-      filters.jobTitle || roles[Math.floor(Math.random() * roles.length)];
-    const selectedLocation =
-      filters.location || locations[Math.floor(Math.random() * locations.length)];
-
-    const candidate = {
-      id: `ext-linkedin-${Date.now()}-${i}`,
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.')}@linkedin.com`,
-      phone: `+91 ${Math.floor(Math.random() * 9000000000) + 1000000000}`,
-      profileUrl: `https://linkedin.com/in/${name.toLowerCase().replace(/\s+/g, '-')}`,
-      externalViewAvailable: true,
-      externalViewMessage: 'Opens the candidate\'s LinkedIn profile in a new tab.',
-      skills: candidateSkills,
-      experience,
-      currentCompany: companies[Math.floor(Math.random() * companies.length)],
-      currentRole: selectedRole,
-      location: selectedLocation,
-      education: educations[Math.floor(Math.random() * educations.length)],
-      bio: `Experienced ${selectedRole} with ${experience} years in software development. Passionate about building scalable applications.`,
-      source: 'linkedin',
-      atsScore: Math.floor(Math.random() * 30) + 70,
-      availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
-      status: 'discovered'
-    };
-
-    buildSalaryInsights(candidate, filters);
-    candidate.matchScore = calculateMatchScore(candidate, filters);
-    results.push(candidate);
-  }
-  
-  return results;
-};
-
-const generateMockNaukriCandidates = (filters, count = 5) => {
-  const names = [
-    'Suresh Kumar', 'Lakshmi Iyer', 'Arun Kumar', 'Deepa Pillai', 'Manoj Singh',
-    'Geetha Krishnan', 'Prakash Reddy', 'Sangeetha Nair', 'Vinod Kumar', 'Radha Menon',
-    'Ramesh Patel', 'Sowmya Rao', 'Kiran Kumar', 'Meena Joshi', 'Sunil Verma'
-  ];
-  
-  const companies = ['Tech Mahindra', 'HCL Technologies', 'L&T Infotech', 'Capgemini', 'Cognizant', 'Mphasis', 'Hexaware', 'Mindtree'];
-  const roles = ['Senior Software Engineer', 'Technical Lead', 'Project Lead', 'Development Manager', 'Architect', 'Principal Engineer'];
-  const locations = ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune', 'Chennai', 'Kolkata', 'Kochi', 'Ahmedabad'];
-  const educations = ['B.Tech Computer Science', 'B.E. Electronics', 'M.Tech Information Technology', 'MCA', 'B.Sc. IT'];
-  
-  const allSkills = ['Java', 'Spring Boot', 'Hibernate', 'React', 'Angular', 'Vue.js', 'Node.js', 'Python', 'Django', 'Flask', 'MySQL', 'Oracle', 'AWS', 'Azure', 'GCP'];
-  
-  const results = [];
-  for (let i = 0; i < count; i++) {
-    const name = names[Math.floor(Math.random() * names.length)];
-    const experience = Math.floor(Math.random() * (filters.experience.max - filters.experience.min + 1)) + filters.experience.min;
-    
-    let candidateSkills = [...(filters.skills || [])];
-    const additionalSkills = allSkills.filter(s => !candidateSkills.includes(s));
-    const numAdditionalSkills = Math.floor(Math.random() * 6) + 3;
-    for (let j = 0; j < numAdditionalSkills; j++) {
-      const randomSkill = additionalSkills[Math.floor(Math.random() * additionalSkills.length)];
-      if (!candidateSkills.includes(randomSkill)) {
-        candidateSkills.push(randomSkill);
-      }
-    }
-    
-    const selectedRole =
-      filters.jobTitle || roles[Math.floor(Math.random() * roles.length)];
-    const selectedLocation =
-      filters.location || locations[Math.floor(Math.random() * locations.length)];
-
-    const candidate = {
-      id: `ext-naukri-${Date.now()}-${i}`,
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.')}@naukri.com`,
-      phone: `+91 ${Math.floor(Math.random() * 9000000000) + 1000000000}`,
-      profileUrl: null,
-      externalViewAvailable: false,
-      externalViewMessage: 'Direct profile viewing is not available for Naukri candidates due to platform restrictions. Contact details and full information are shown in the detail view.',
-      skills: candidateSkills,
-      experience,
-      currentCompany: companies[Math.floor(Math.random() * companies.length)],
-      currentRole: selectedRole,
-      location: selectedLocation,
-      education: educations[Math.floor(Math.random() * educations.length)],
-      bio: `Results-driven professional with ${experience} years of expertise in software development and team leadership.`,
-      source: 'naukri',
-      atsScore: Math.floor(Math.random() * 30) + 70,
-      availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
-      status: 'discovered'
-    };
-
-    buildSalaryInsights(candidate, filters);
-    candidate.matchScore = calculateMatchScore(candidate, filters);
-    results.push(candidate);
-  }
-  
-  return results;
-};
+// Mock data generation functions removed - using real employee profiles instead
 
 app.post('/api/talent-scout/search', (req, res) => {
   try {
     const {
-      platform,
       keywords,
       location,
       experience,
-      skills = [],
-      salaryBudget,
-      jobTitle,
-      industry,
-      companySize
+      skills = []
     } = req.body;
     
     if (!keywords || !keywords.trim()) {
@@ -2128,173 +1905,61 @@ app.post('/api/talent-scout/search', (req, res) => {
       });
     }
     
-    const normalizeBudgetValue = (value) => {
-      if (value === null || value === undefined) {
-        return null;
-      }
-      const numeric = Number(value);
-      if (Number.isNaN(numeric)) {
-        return null;
-      }
-      return numeric <= 1000 ? Math.round(numeric * 100000) : Math.round(numeric);
-    };
-    
-    let parsedBudget = null;
-    let derivedExperienceRange = null;
-    
-    if (salaryBudget && typeof salaryBudget === 'object') {
-      const minBudget = normalizeBudgetValue(salaryBudget.min);
-      const maxBudget = normalizeBudgetValue(salaryBudget.max);
-      
-      if (minBudget !== null && maxBudget !== null && maxBudget > 0) {
-        parsedBudget = {
-          min: Math.min(minBudget, maxBudget),
-          max: Math.max(minBudget, maxBudget),
-          includeNegotiable: salaryBudget.includeNegotiable !== false
-        };
-        
-        derivedExperienceRange = getExperienceFromSalary(parsedBudget);
-      }
-    }
-    
-    const experienceRange = derivedExperienceRange 
+    const experienceRange = experience && typeof experience === 'object'
       ? {
-          min: derivedExperienceRange.min,
-          max: derivedExperienceRange.max
+          min: typeof experience.min === 'number' ? experience.min : 0,
+          max: typeof experience.max === 'number' ? experience.max : 15
         }
-      : (experience && typeof experience === 'object'
-          ? {
-              min: typeof experience.min === 'number' ? experience.min : 0,
-              max: typeof experience.max === 'number' ? experience.max : 15
-            }
-          : { min: 0, max: 15 });
+      : { min: 0, max: 15 };
     
     const filters = {
-      platform: platform || 'both',
       keywords: keywords.trim(),
       location: location || '',
       experience: experienceRange,
-      skills: Array.isArray(skills) ? skills : [],
-      salaryBudget: parsedBudget,
-      jobTitle: jobTitle || keywords.trim(),
-      industry: industry || 'IT/Tech',
-      companySize: companySize || 'SME',
-      experienceFromSalary: derivedExperienceRange
+      skills: Array.isArray(skills) ? skills : []
     };
     
-    let results = [];
-    const resultsPerPlatform = req.body.resultsPerPlatform || 20;
+    let filteredResults = talentScoutProfiles.filter(profile => {
+      const keywordLower = filters.keywords.toLowerCase();
+      const keywordMatch = 
+        profile.name.toLowerCase().includes(keywordLower) ||
+        profile.currentRole.toLowerCase().includes(keywordLower) ||
+        (profile.bio && profile.bio.toLowerCase().includes(keywordLower)) ||
+        profile.skills.some(skill => skill.toLowerCase().includes(keywordLower));
+      
+      if (!keywordMatch) return false;
+      
+      if (filters.location && filters.location.trim()) {
+        const locationMatch = profile.location.toLowerCase().includes(filters.location.toLowerCase());
+        if (!locationMatch) return false;
+      }
+      
+      if (profile.experience < filters.experience.min || profile.experience > filters.experience.max) {
+        return false;
+      }
+      
+      if (filters.skills.length > 0) {
+        const profileSkillsLower = profile.skills.map(s => s.toLowerCase());
+        const hasRequiredSkills = filters.skills.some(reqSkill => 
+          profileSkillsLower.some(profileSkill => 
+            profileSkill.includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(profileSkill)
+          )
+        );
+        if (!hasRequiredSkills) return false;
+      }
+      
+      return true;
+    });
     
-    if (filters.platform === 'both' || filters.platform === 'linkedin') {
-      results = results.concat(generateMockLinkedInCandidates(filters, resultsPerPlatform));
-    }
-    
-    if (filters.platform === 'both' || filters.platform === 'naukri') {
-      results = results.concat(generateMockNaukriCandidates(filters, resultsPerPlatform));
-    }
-    
-    let filteredResults = results.filter(candidate => 
-      AVAILABLE_AVAILABILITY_STATUSES.has(candidate.availability)
-    );
-
-    if (derivedExperienceRange && Array.isArray(derivedExperienceRange.probabilities)) {
-      filteredResults = filteredResults.map(candidate => {
-        const probabilityMatch = derivedExperienceRange.probabilities.find(entry => {
-          const minYears = entry.experience.min;
-          const maxYears = entry.experience.max;
-          return candidate.experience >= minYears && candidate.experience <= maxYears;
-        });
-
-        if (probabilityMatch) {
-          candidate.experienceProbability = probabilityMatch.probability;
-          candidate.experienceRangeMatch = probabilityMatch.experience;
-        } else {
-          candidate.experienceProbability = null;
-          candidate.experienceRangeMatch = null;
-        }
-
-        return candidate;
-      });
-    }
+    filteredResults = filteredResults.map(profile => {
+      const profileWithScore = { ...profile };
+      profileWithScore.matchScore = calculateMatchScore(profileWithScore, filters);
+      return profileWithScore;
+    });
     
     filteredResults.sort((a, b) => b.matchScore - a.matchScore);
     
-    filteredResults.forEach(candidate => {
-      const existing = externalCandidates.find(c => c.id === candidate.id);
-      if (!existing) {
-        externalCandidates.push(candidate);
-      }
-    });
-    
-    const expectedValues = filteredResults
-      .map(candidate => candidate.expectedCtc)
-      .filter(value => typeof value === 'number');
-    
-    const averageExpectedCtc = expectedValues.length
-      ? Math.round(expectedValues.reduce((sum, value) => sum + value, 0) / expectedValues.length)
-      : null;
-    
-    const medianExpectedCtc = expectedValues.length
-      ? (() => {
-          const sorted = [...expectedValues].sort((a, b) => a - b);
-          const mid = Math.floor(sorted.length / 2);
-          if (sorted.length % 2 === 0) {
-            return Math.round((sorted[mid - 1] + sorted[mid]) / 2);
-          }
-          return sorted[mid];
-        })()
-      : null;
-    
-    const representativeExperience = Math.round((filters.experience.min + filters.experience.max) / 2);
-    const representativeLocation = filters.location || (filteredResults[0]?.location ?? 'Bangalore');
-    const representativeSkills = filters.skills.length
-      ? filters.skills
-      : (filteredResults[0]?.skills?.slice(0, 6) || []);
-    
-    const summaryPrediction = predictSalary({
-      experience: representativeExperience,
-      role: filters.jobTitle,
-      location: representativeLocation,
-      industry: filters.industry,
-      skills: representativeSkills,
-      companySize: filters.companySize
-    });
-    
-    const summaryComparisons = getMarketComparison({
-      experience: representativeExperience,
-      role: filters.jobTitle,
-      location: representativeLocation,
-      industry: filters.industry,
-      skills: representativeSkills,
-      companySize: filters.companySize
-    }).map(entry => ({
-      label: entry.companySize || entry.location,
-      type: entry.companySize ? 'companySize' : 'location',
-      salaryRange: entry.salaryRange,
-      multiplier: entry.multiplier
-    }));
-    
-    const salarySummary = {
-      budgetRange: parsedBudget,
-      predictedRange: summaryPrediction.salaryRange,
-      breakdown: summaryPrediction.breakdown,
-      averageExpectedCtc,
-      medianExpectedCtc,
-      candidateCount: filteredResults.length,
-      totalGenerated: results.length,
-      marketComparisons: summaryComparisons,
-      experienceMapping: derivedExperienceRange,
-      formatted: {
-        averageExpectedCtc: averageExpectedCtc ? formatSalary(averageExpectedCtc) : null,
-        medianExpectedCtc: medianExpectedCtc ? formatSalary(medianExpectedCtc) : null,
-        budgetMin: parsedBudget ? formatSalary(parsedBudget.min) : null,
-        budgetMax: parsedBudget ? formatSalary(parsedBudget.max) : null,
-        predictedMin: formatSalary(summaryPrediction.salaryRange.min),
-        predictedMax: formatSalary(summaryPrediction.salaryRange.max)
-      }
-    };
-    
-    res.json({ success: true, data: filteredResults, salarySummary });
+    res.json({ success: true, data: filteredResults });
   } catch (error) {
     console.error('Talent scout search error:', error);
     res.status(500).json({ 
@@ -2305,32 +1970,29 @@ app.post('/api/talent-scout/search', (req, res) => {
 });
 
 app.get('/api/talent-scout/candidates', (req, res) => {
-  const invitedCandidates = externalCandidates.filter(c => 
-    (c.status === 'invited' || c.status === 'applied') && 
-    AVAILABLE_AVAILABILITY_STATUSES.has(c.availability)
-  );
-  res.json({ success: true, data: invitedCandidates });
+  const invitedProfiles = talentScoutProfiles.filter(p => p.status === 'invited');
+  res.json({ success: true, data: invitedProfiles });
 });
 
 app.post('/api/talent-scout/invite', (req, res) => {
   try {
     const { candidateId, jobId, message } = req.body;
     
-    const candidate = externalCandidates.find(c => c.id === candidateId);
+    const profile = talentScoutProfiles.find(p => p.id === candidateId);
     
-    if (!candidate) {
+    if (!profile) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Candidate not found' 
+        message: 'Profile not found' 
       });
     }
     
-    candidate.status = 'invited';
-    candidate.invitedAt = new Date();
+    profile.status = 'invited';
+    profile.invitedAt = new Date();
     
     notifications.unshift({
       id: `notif-${Date.now()}`,
-      message: `Invitation sent to ${candidate.name} from ${candidate.source}`,
+      message: `Invitation sent to ${profile.name} for internal opportunity`,
       type: 'talent-scout',
       read: false,
       timestamp: new Date()
@@ -2338,14 +2000,79 @@ app.post('/api/talent-scout/invite', (req, res) => {
     
     res.json({ 
       success: true, 
-      message: `Invitation sent successfully to ${candidate.name}`,
-      data: candidate
+      message: `Successfully contacted ${profile.name}`,
+      data: profile
     });
   } catch (error) {
     console.error('Talent scout invite error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to send invitation' 
+    });
+  }
+});
+
+app.post('/api/talent-scout/upload', upload.array('resumes', 10), async (req, res) => {
+  try {
+    const files = req.files || [];
+    const parsedProfiles = [];
+
+    for (const file of files) {
+      let extractedText = '';
+
+      if (file.mimetype === 'application/pdf') {
+        try {
+          const buffer = fs.readFileSync(file.path);
+          const data = await pdf(buffer);
+          extractedText = data.text;
+        } catch (error) {
+          console.error('Error parsing PDF:', error);
+          continue;
+        }
+      } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const result = await mammoth.extractRawText({ path: file.path });
+        extractedText = result.value;
+      } else {
+        continue;
+      }
+
+      const emailMatch = extractedText.match(/[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}/);
+      const phoneMatch = extractedText.match(/[+]?\d[\d\s-]{8,}/);
+      const skillsMatch = extractedText.match(/(React|Node\.js|Python|Java|AWS|MongoDB|TypeScript|JavaScript|Docker|Kubernetes|CI\/CD|AI|ML|Angular|Vue|Django|Flask|PostgreSQL|MySQL|Redis|GraphQL|Spring|Hibernate|\.NET|C\+\+|C#|Ruby|Rails|Go|Rust|Swift|Kotlin|TensorFlow|PyTorch|Data Science|Machine Learning|DevOps|Agile|Scrum)/gi) || [];
+      const experienceMatch = extractedText.match(/(\d+)\+?\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|exp)/i);
+      const locationMatch = extractedText.match(/(?:location|based in|city)[\s:]+([A-Z][a-zA-Z\s]+)(?:\n|,|\.|$)/i);
+
+      const profile = {
+        id: `scout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: file.originalname.replace(/\.(pdf|docx)$/i, '').replace(/[-_]/g, ' '),
+        email: emailMatch ? emailMatch[0] : `employee${Date.now()}@company.com`,
+        phone: phoneMatch ? phoneMatch[0] : '+91 9876543210',
+        skills: [...new Set(skillsMatch.map(skill => skill.charAt(0).toUpperCase() + skill.slice(1).toLowerCase()))],
+        experience: experienceMatch ? parseInt(experienceMatch[1]) : Math.floor(Math.random() * 8) + 2,
+        currentCompany: 'Current Organization',
+        currentRole: 'Software Professional',
+        location: locationMatch ? locationMatch[1].trim() : ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune'][Math.floor(Math.random() * 4)],
+        education: 'B.Tech Computer Science',
+        bio: extractedText.substring(0, 200).trim() + '...',
+        source: 'internal',
+        atsScore: Math.floor(Math.random() * 20) + 80,
+        matchScore: 0,
+        availability: 'Available',
+        status: 'discovered',
+        resumeUrl: `/uploads/${file.filename}`,
+        createdAt: new Date()
+      };
+
+      talentScoutProfiles.push(profile);
+      parsedProfiles.push(profile);
+    }
+
+    res.json({ success: true, data: parsedProfiles, message: `Successfully uploaded ${parsedProfiles.length} profile(s)` });
+  } catch (error) {
+    console.error('Error uploading employee profiles:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to upload employee profiles' 
     });
   }
 });

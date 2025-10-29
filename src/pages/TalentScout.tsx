@@ -20,60 +20,33 @@ import {
   Phone,
   TrendingUp,
   Info,
-  IndianRupee
+  Upload
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { talentScoutService } from '../services/talentScoutService';
-import { SalaryFilterSection } from '../components/talent-scout/SalaryFilterSection';
-import { ExternalCandidate, SearchFilters, SalarySummary } from '../types/talentScout.types';
-
-const INDUSTRY_OPTIONS = [
-  { label: 'IT / Technology', value: 'IT/Tech' },
-  { label: 'Finance & Banking', value: 'Finance' },
-  { label: 'Healthcare & Pharma', value: 'Healthcare' },
-  { label: 'Manufacturing', value: 'Manufacturing' },
-  { label: 'E-Commerce & Retail', value: 'E-Commerce' },
-  { label: 'Consulting & Services', value: 'Consulting' },
-  { label: 'Education / EdTech', value: 'EdTech' },
-  { label: 'Telecom & Networking', value: 'Telecom' },
-  { label: 'Automotive', value: 'Automotive' },
-  { label: 'Media & Entertainment', value: 'Media' }
-];
-
-const COMPANY_SIZE_OPTIONS = [
-  { label: 'Startup (1 - 50 employees)', value: 'Startup' },
-  { label: 'Scale-up (51 - 500)', value: 'SME' },
-  { label: 'Mid-Size (501 - 2000)', value: 'Mid-Size' },
-  { label: 'Large (2000 - 10000)', value: 'Large' },
-  { label: 'MNC / Enterprise (10000+)', value: 'MNC' }
-];
+import { ExternalCandidate, SearchFilters } from '../types/talentScout.types';
 
 export const TalentScout: React.FC = () => {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    platform: 'both',
+    platform: 'internal',
     keywords: '',
     location: '',
     experience: { min: 0, max: 15 },
-    skills: [],
-    salaryBudget: null,
-    jobTitle: '',
-    industry: 'IT/Tech',
-    companySize: 'SME'
+    skills: []
   });
   
   const [skillInput, setSkillInput] = useState('');
   const [candidates, setCandidates] = useState<ExternalCandidate[]>([]);
   const [savedCandidates, setSavedCandidates] = useState<ExternalCandidate[]>([]);
-  const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<ExternalCandidate | null>(null);
   const [inviteMessage, setInviteMessage] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
-  const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [activeTab, setActiveTab] = useState<'search' | 'saved' | 'upload'>('search');
+  const [uploadingResumes, setUploadingResumes] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
 
   useEffect(() => {
     loadSavedCandidates();
@@ -102,14 +75,11 @@ export const TalentScout: React.FC = () => {
       skills: [...searchFilters.skills]
     };
 
-    setSalarySummary(null);
     setIsSearching(true);
     try {
-      const response = await talentScoutService.search({ ...filtersSnapshot, resultsPerPlatform: 20 });
+      const response = await talentScoutService.search(filtersSnapshot);
       if (response.success) {
         setCandidates(response.data);
-        setSalarySummary(response.salarySummary || null);
-        setLastSearchFilters(filtersSnapshot);
       }
     } catch (error) {
       console.error('Error searching candidates:', error);
@@ -119,23 +89,27 @@ export const TalentScout: React.FC = () => {
     }
   };
 
-  const handleLoadMore = async () => {
-    if (!lastSearchFilters) return;
+  const handleUploadResumes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFiles || selectedFiles.length === 0) {
+      alert('Please select resume files to upload');
+      return;
+    }
 
-    setIsLoadingMore(true);
+    setUploadingResumes(true);
     try {
-      const response = await talentScoutService.search({ ...lastSearchFilters, resultsPerPlatform: 10 });
+      const response = await talentScoutService.uploadResumes(selectedFiles);
       if (response.success) {
-        setCandidates(prev => mergeCandidates(prev, response.data));
-        if (response.salarySummary) {
-          setSalarySummary(response.salarySummary);
-        }
+        alert(`Successfully uploaded ${response.data.length} resume(s)`);
+        setSelectedFiles(null);
+        const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
       }
     } catch (error) {
-      console.error('Error loading more candidates:', error);
-      alert('Failed to load more candidates. Please try again.');
+      console.error('Error uploading resumes:', error);
+      alert('Failed to upload resumes. Please try again.');
     } finally {
-      setIsLoadingMore(false);
+      setUploadingResumes(false);
     }
   };
 
@@ -221,7 +195,7 @@ export const TalentScout: React.FC = () => {
     return 'text-orange-600 bg-orange-50 border-orange-200';
   };
 
-  const getPlatformIcon = (source: 'linkedin' | 'naukri') => {
+  const getPlatformIcon = (source: ExternalCandidate['source']) => {
     if (source === 'linkedin') {
       return (
         <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-xs font-medium">
@@ -230,10 +204,20 @@ export const TalentScout: React.FC = () => {
         </div>
       );
     }
+
+    if (source === 'naukri') {
+      return (
+        <div className="flex items-center space-x-1 px-2 py-1 bg-orange-50 text-orange-600 rounded-md text-xs font-medium">
+          <Globe className="w-3.5 h-3.5" />
+          <span>Naukri</span>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex items-center space-x-1 px-2 py-1 bg-orange-50 text-orange-600 rounded-md text-xs font-medium">
-        <Globe className="w-3.5 h-3.5" />
-        <span>Naukri</span>
+      <div className="flex items-center space-x-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium">
+        <Building2 className="w-3.5 h-3.5" />
+        <span>Internal</span>
       </div>
     );
   };
@@ -267,41 +251,6 @@ export const TalentScout: React.FC = () => {
         <span>{availability}</span>
       </span>
     );
-  };
-
-  const formatCurrency = (amount?: number) => {
-    if (!amount) return 'Not Specified';
-    return `₹${(amount / 100000).toFixed(1)}L`;
-  };
-
-  const getSalaryFitStyles = (status?: ExternalCandidate['salaryFitStatus']) => {
-    switch (status) {
-      case 'perfect-match':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'below-budget':
-        return 'bg-green-50 text-green-700 border-green-200';
-      case 'negotiable':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'above-budget':
-        return 'bg-red-50 text-red-600 border-red-200';
-      default:
-        return 'bg-gray-50 text-gray-600 border-gray-200';
-    }
-  };
-
-  const getSalaryFitLabel = (status?: ExternalCandidate['salaryFitStatus']) => {
-    switch (status) {
-      case 'perfect-match':
-        return 'Within Budget';
-      case 'below-budget':
-        return 'Below Budget';
-      case 'negotiable':
-        return 'Negotiable Fit';
-      case 'above-budget':
-        return 'Above Budget';
-      default:
-        return 'Salary Insight';
-    }
   };
 
   const renderCandidateCard = (candidate: ExternalCandidate) => {
@@ -367,21 +316,6 @@ export const TalentScout: React.FC = () => {
             </div>
           </div>
 
-          {typeof candidate.experienceProbability === 'number' && candidate.experienceRangeMatch && (
-            <div className="mb-4 p-3 border border-indigo-100 rounded-lg bg-indigo-50">
-              <div className="flex items-center justify-between text-sm font-semibold text-indigo-700">
-                <div className="flex items-center space-x-2">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Experience fit probability</span>
-                </div>
-                <span>{candidate.experienceProbability}%</span>
-              </div>
-              <p className="text-xs text-indigo-600 mt-1">
-                Aligns with the expected range of {candidate.experienceRangeMatch.min} - {candidate.experienceRangeMatch.max} years for this salary band.
-              </p>
-            </div>
-          )}
-
           {/* Bio Section */}
           {candidate.bio && (
             <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
@@ -410,7 +344,7 @@ export const TalentScout: React.FC = () => {
           </div>
 
           {/* Scores Section */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="grid grid-cols-2 gap-2 mb-4">
             <div className={`text-center p-3 rounded-lg border ${getScoreColor(candidate.atsScore)}`}>
               <div className="text-xl font-bold">{candidate.atsScore}%</div>
               <div className="text-[10px] font-medium uppercase tracking-wide mt-0.5">ATS Score</div>
@@ -419,43 +353,7 @@ export const TalentScout: React.FC = () => {
               <div className="text-xl font-bold">{candidate.matchScore}%</div>
               <div className="text-[10px] font-medium uppercase tracking-wide mt-0.5">Match</div>
             </div>
-            <div className="text-center p-3 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700">
-              <div className="text-lg font-bold">{formatCurrency(candidate.expectedCtc)}</div>
-              <div className="text-[10px] font-medium uppercase tracking-wide mt-0.5">Expected CTC</div>
-            </div>
           </div>
-
-          {/* Salary Fit Section */}
-          {candidate.salaryInsights && candidate.salaryInsights.salaryFit && (
-            <div className={`mb-4 p-3 rounded-lg border ${getSalaryFitStyles(candidate.salaryFitStatus)}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center space-x-1.5">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase">{getSalaryFitLabel(candidate.salaryFitStatus)}</span>
-                </div>
-                <span className="text-xs font-bold">{candidate.salaryFitPercentage}%</span>
-              </div>
-              <p className="text-xs leading-relaxed">
-                {candidate.salaryInsights.salaryFit.message}
-              </p>
-              {candidate.salaryInsights.formatted && (
-                <div className="mt-2 pt-2 border-t border-current/10 text-[10px] space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>Expected:</span>
-                    <span className="font-semibold">{candidate.salaryInsights.formatted.expectedCtc}</span>
-                  </div>
-                  {candidate.salaryInsights.formatted.budgetMax && (
-                    <div className="flex justify-between">
-                      <span>Budget Range:</span>
-                      <span className="font-semibold">
-                        {candidate.salaryInsights.formatted.budgetMin} - {candidate.salaryInsights.formatted.budgetMax}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-2 pt-3 border-t border-gray-100">
@@ -538,6 +436,19 @@ export const TalentScout: React.FC = () => {
               </span>
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('upload')}
+            className={`px-6 py-3 font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === 'upload'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Upload className="w-4 h-4" />
+              <span>Upload Resumes</span>
+            </div>
+          </button>
         </div>
 
         {activeTab === 'search' && (
@@ -549,27 +460,7 @@ export const TalentScout: React.FC = () => {
                 <h2 className="text-lg font-bold text-gray-900">Search Filters</h2>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Platform
-                  </label>
-                  <select
-                    value={searchFilters.platform}
-                    onChange={e =>
-                      setSearchFilters(prev => ({
-                        ...prev,
-                        platform: e.target.value as 'both' | 'linkedin' | 'naukri'
-                      }))
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 text-gray-900 font-medium"
-                  >
-                    <option value="both">🌐 Both Platforms</option>
-                    <option value="linkedin">💼 LinkedIn Only</option>
-                    <option value="naukri">🔍 Naukri Only</option>
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Keywords *
@@ -580,7 +471,7 @@ export const TalentScout: React.FC = () => {
                     onChange={e =>
                       setSearchFilters(prev => ({ ...prev, keywords: e.target.value }))
                     }
-                    placeholder="e.g., Software Engineer"
+                    placeholder="e.g., Software Engineer, React Developer"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
@@ -596,6 +487,49 @@ export const TalentScout: React.FC = () => {
                       setSearchFilters(prev => ({ ...prev, location: e.target.value }))
                     }
                     placeholder="e.g., Bangalore"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Minimum Experience (years)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={searchFilters.experience.min}
+                    onChange={e =>
+                      setSearchFilters(prev => ({
+                        ...prev,
+                        experience: {
+                          ...prev.experience,
+                          min: Math.max(0, Number(e.target.value))
+                        }
+                      }))
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Maximum Experience (years)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={searchFilters.experience.max}
+                    onChange={e =>
+                      setSearchFilters(prev => ({
+                        ...prev,
+                        experience: {
+                          ...prev.experience,
+                          max: Math.max(prev.experience.min, Number(e.target.value))
+                        }
+                      }))
+                    }
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
@@ -649,11 +583,6 @@ export const TalentScout: React.FC = () => {
                 )}
               </div>
 
-              <SalaryFilterSection
-                searchFilters={searchFilters}
-                setSearchFilters={setSearchFilters}
-              />
-
               <Button
                 type="submit"
                 variant="primary"
@@ -702,16 +631,6 @@ export const TalentScout: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {candidates.map(candidate => renderCandidateCard(candidate))}
                 </div>
-                <div className="mt-8 flex justify-center">
-                  <Button
-                    onClick={handleLoadMore}
-                    variant="outline"
-                    isLoading={isLoadingMore}
-                    className="px-8"
-                  >
-                    Load more candidates
-                  </Button>
-                </div>
               </div>
             )}
           </>
@@ -741,6 +660,76 @@ export const TalentScout: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === 'upload' && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Upload className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Upload Employee Resumes</h2>
+                <p className="text-gray-600 text-sm">Add employee profiles to the internal talent pool</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUploadResumes} className="space-y-6">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 transition-colors">
+                <input
+                  id="resume-upload"
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx"
+                  onChange={(e) => setSelectedFiles(e.target.files)}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="resume-upload"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <Upload className="w-16 h-16 text-gray-400 mb-4" />
+                  <p className="text-lg font-semibold text-gray-700 mb-2">
+                    Click to upload or drag and drop
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    PDF or DOCX files (Multiple files supported)
+                  </p>
+                  {selectedFiles && selectedFiles.length > 0 && (
+                    <div className="mt-4 text-sm text-indigo-600 font-medium">
+                      {selectedFiles.length} file(s) selected
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={uploadingResumes}
+                disabled={!selectedFiles || selectedFiles.length === 0}
+                className="w-full py-3 text-base bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
+              >
+                <Upload className="w-5 h-5 mr-2" />
+                {uploadingResumes ? 'Uploading...' : 'Upload Resumes'}
+              </Button>
+            </form>
+
+            <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-700">
+                  <p className="font-semibold mb-1">How it works:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Upload employee resumes in PDF or DOCX format</li>
+                    <li>The system will automatically extract skills, experience, and contact details</li>
+                    <li>Profiles will be added to the searchable talent pool</li>
+                    <li>Use the Search tab to find matching candidates for your requirements</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -832,15 +821,11 @@ export const TalentScout: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Availability</p>
-                      {getAvailabilityBadge(selectedCandidate.availability)}
+                      <span className="font-semibold text-gray-900">{selectedCandidate.availability || 'Not Specified'}</span>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <p className="text-sm text-gray-600 mb-1">Education</p>
                       <p className="font-semibold text-gray-900">{selectedCandidate.education}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Expected CTC</p>
-                      <p className="font-semibold text-gray-900">{formatCurrency(selectedCandidate.expectedCtc)}</p>
                     </div>
                   </div>
                 </div>
