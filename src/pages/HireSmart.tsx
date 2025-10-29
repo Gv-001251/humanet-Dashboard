@@ -90,7 +90,10 @@ export const HireSmart: React.FC = () => {
         body: formData
       });
 
-      if (!response.ok) throw new Error('Failed to upload resumes');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to upload resumes' }));
+        throw new Error(errorData.message || 'Failed to upload resumes');
+      }
 
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
@@ -109,10 +112,12 @@ export const HireSmart: React.FC = () => {
           education: candidate.education ?? 'Not specified'
         }));
         setCandidates(prev => [...prev, ...parsedCandidates]);
+        alert(`Successfully uploaded ${parsedCandidates.length} resume(s)!`);
       }
     } catch (error) {
       console.error('Error uploading resumes:', error);
-      alert('Failed to upload resumes. Using mock data for demo.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to upload resumes: ${errorMessage}. Using mock data for demo.`);
       
       // Mock data for demo
       const mockCandidates: Candidate[] = Array.from({ length: files.length }, (_, i) => ({
@@ -303,7 +308,7 @@ export const HireSmart: React.FC = () => {
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.csv"
+            accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-word.document.macroEnabled.12,text/csv,.pdf,.doc,.docx,.csv"
             onChange={handleFileUpload}
             className="hidden"
           />
