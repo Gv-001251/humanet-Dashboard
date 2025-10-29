@@ -5,44 +5,43 @@
 The webapp is configured to connect to MongoDB Atlas using the following connection string:
 
 ```
-mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 ```
 
 This connection string is stored in `/humanet-backend/.env` as:
 
 ```env
-MONGODB_URI=mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+MONGODB_URI=mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 DB_NAME=humanet_hr
 PORT=3001
 NODE_ENV=development
 ```
 
-## Important Note About Atlas SQL Interface
+**Note**: Replace `<db_password>` with your actual MongoDB Atlas password.
 
-⚠️ **Important**: The provided URI appears to be for **MongoDB Atlas SQL interface**, which is designed for SQL queries on MongoDB data. This interface may not be fully compatible with the standard MongoDB Node.js driver used in this application.
+## Connection String Format
 
-### Atlas SQL vs Standard MongoDB Connection
+The application now uses the **MongoDB+srv connection string** format, which is the standard and recommended way to connect to MongoDB Atlas:
 
-- **Atlas SQL** (`atlas-sql-*.a.query.mongodb.net`): Used for SQL-based queries on MongoDB data
-- **Standard MongoDB** (`*.mongodb.net` or `mongodb+srv://`): Used for native MongoDB operations
+- **mongodb+srv://** - Uses SRV records for automatic replica set discovery
+- Automatically handles connection string options
+- More secure and reliable than the legacy connection format
 
 ### If Connection Issues Occur
 
-If you experience connection issues with the Atlas SQL endpoint, you have two options:
+If you experience connection issues, you have two options:
 
-#### Option 1: Use Standard MongoDB Atlas Connection String (Recommended)
+#### Option 1: Update Your Password
 
-Get your standard MongoDB Atlas connection string from your Atlas dashboard:
+Make sure you've replaced `<db_password>` in your `.env` file with your actual MongoDB Atlas password:
 
-1. Log into [MongoDB Atlas](https://cloud.mongodb.com)
-2. Click "Connect" on your cluster
-3. Choose "Connect your application"
-4. Copy the connection string (format: `mongodb+srv://username:password@cluster.mongodb.net/dbname`)
-5. Update `/humanet-backend/.env` with the new URI
+1. Get your password from MongoDB Atlas credentials
+2. Update `/humanet-backend/.env` with your actual password
+3. Restart the server
 
 Example:
 ```env
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/humanet_hr?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://navageevithang_db_user:yourActualPassword@humanet-cluster.h99gras.mongodb.net/
 DB_NAME=humanet_hr
 ```
 
@@ -110,7 +109,7 @@ All MongoDB-related configuration is in `/humanet-backend/.env`:
 
 ```env
 # MongoDB Atlas Connection
-MONGODB_URI=mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+MONGODB_URI=mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 
 # Database Name
 DB_NAME=humanet_hr
@@ -119,6 +118,8 @@ DB_NAME=humanet_hr
 PORT=3001
 NODE_ENV=development
 ```
+
+Remember to replace `<db_password>` with your actual MongoDB Atlas password.
 
 ## Security Best Practices
 

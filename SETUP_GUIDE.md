@@ -26,13 +26,13 @@ npm install
 #### Backend Configuration
 Create or update `/humanet-backend/.env`:
 ```env
-MONGODB_URI=mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+MONGODB_URI=mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 DB_NAME=humanet_hr
 PORT=3001
 NODE_ENV=development
 ```
 
-**Note**: The application will fall back to in-memory storage if MongoDB connection fails. See `MONGODB_ATLAS_SETUP.md` for detailed connection information.
+**Note**: Replace `<db_password>` with your actual MongoDB Atlas password. The application will fall back to in-memory storage if MongoDB connection fails. See `MONGODB_ATLAS_SETUP.md` for detailed connection information.
 
 #### Frontend Configuration
 Create or update `/.env`:
