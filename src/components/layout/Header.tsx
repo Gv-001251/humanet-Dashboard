@@ -1,22 +1,13 @@
 import React from 'react';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
 export const Header: React.FC = () => {
-  const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
-  const initials = user?.name
-    ? user.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase()
-    : 'HN';
+  const initials = 'HN';
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-border bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
@@ -44,8 +35,8 @@ export const Header: React.FC = () => {
               {initials}
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-neutral-text">{user?.name || 'HumaNet User'}</p>
-              <p className="text-xs text-neutral-muted">{user?.role ? user.role : 'HR Leader'}</p>
+              <p className="text-sm font-semibold text-neutral-text">HumaNet User</p>
+              <p className="text-xs text-neutral-muted">HR Leader</p>
             </div>
           </div>
         </div>

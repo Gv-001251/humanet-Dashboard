@@ -190,10 +190,7 @@ export const HireSmart: React.FC = () => {
     for (const candidateId of candidateIds) {
       try {
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
-          }
+          method: 'DELETE'
         });
 
         if (response.ok) {
