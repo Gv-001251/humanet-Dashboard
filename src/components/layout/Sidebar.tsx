@@ -11,20 +11,22 @@ import {
   HelpCircle,
   LogOut,
   ChevronDown,
-  User as UserIcon
+  User as UserIcon,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../common/Button';
 
 const menuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/hiresmart', label: 'HireSmart', icon: Target },
-  { path: '/automatch', label: 'AutoMatch', icon: Users },
-  { path: '/salary-analysis', label: 'Salary Analysis', icon: DollarSign },
-  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/messages', label: 'Messages', icon: Mail },
-  { path: '/settings', label: 'Settings', icon: Settings },
-  { path: '/help', label: 'Help & Info', icon: HelpCircle }
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard Overview' },
+  { path: '/hiresmart', label: 'HireSmart', icon: Target, tooltip: 'Upload & Parse Resumes' },
+  { path: '/talent-scout', label: 'Talent Scout', icon: Search, tooltip: 'Search LinkedIn & Naukri' },
+  { path: '/automatch', label: 'AutoMatch', icon: Users, tooltip: 'AI-Powered Team Matching' },
+  { path: '/salary-analysis', label: 'Salary Analysis', icon: DollarSign, tooltip: 'Salary Benchmarking' },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3, tooltip: 'HR Analytics Dashboard' },
+  { path: '/messages', label: 'Messages', icon: Mail, tooltip: 'Internal Communication' },
+  { path: '/settings', label: 'Settings', icon: Settings, tooltip: 'Platform Settings' },
+  { path: '/help', label: 'Help & Info', icon: HelpCircle, tooltip: 'Help & Information' }
 ];
 
 export const Sidebar: React.FC = () => {
@@ -60,6 +62,7 @@ export const Sidebar: React.FC = () => {
             <NavLink
               key={item.path}
               to={item.path}
+              title={item.tooltip || item.label}
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive

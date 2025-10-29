@@ -7,6 +7,7 @@ import { Login } from './pages/auth/Login';
 import { Dashboard } from './pages/Dashboard';
 import { HireSmart } from './pages/HireSmart';
 import { AutoMatch } from './pages/AutoMatch';
+import { TalentScout } from './pages/TalentScout';
 import { SalaryAnalysis } from './pages/SalaryAnalysis';
 import { Analytics } from './pages/Analytics';
 import { Messages } from './pages/Messages';
@@ -57,6 +58,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <AutoMatch />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/talent-scout"
+      element={
+        <ProtectedRoute>
+          <TalentScout />
         </ProtectedRoute>
       }
     />
