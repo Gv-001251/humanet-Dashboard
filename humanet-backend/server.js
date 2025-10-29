@@ -33,6 +33,33 @@ const authRoutes = require('./src/routes/authRoutes');
 const { authenticate } = require('./src/middleware/authMiddleware');
 const { cleanupExpiredTokens } = require('./src/utils/jwtUtils');
 
+const createMongoSanitizeMiddleware = (options = {}) => {
+  const hasOnSanitize = typeof options.onSanitize === 'function';
+
+  const sanitizeSection = (req, key) => {
+    const value = req[key];
+
+    if (!value || typeof value !== 'object') {
+      return;
+    }
+
+    const hadProhibitedKeys = mongoSanitize.has(value, options.allowDots);
+    mongoSanitize.sanitize(value, options);
+
+    if (hadProhibitedKeys && hasOnSanitize) {
+      options.onSanitize({ req, key });
+    }
+  };
+
+  return (req, res, next) => {
+    sanitizeSection(req, 'body');
+    sanitizeSection(req, 'params');
+    sanitizeSection(req, 'headers');
+    sanitizeSection(req, 'query');
+    next();
+  };
+};
+
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
   'application/pdf': true,
@@ -69,7 +96,7 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(mongoSanitize());
+app.use(createMongoSanitizeMiddleware());
 app.use(xssClean());
 app.use(hpp());
 app.use(compression());
