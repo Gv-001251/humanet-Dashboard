@@ -14,10 +14,6 @@ const faqs: FAQItem[] = [
     answer: 'Go to HireSmart page, click "Upload Resumes" button, and select PDF, DOCX, or CSV files from your computer. You can upload multiple files at once.'
   },
   {
-    question: 'What is ATS score?',
-    answer: 'ATS (Applicant Tracking System) score is an AI-calculated percentage (0-100%) that measures how well a candidate\'s resume matches the job requirements. A score above 70% is generally considered good.'
-  },
-  {
     question: 'How does AutoMatch work?',
     answer: 'AutoMatch analyzes project requirements and employee skills/availability to recommend the best team composition.'
   },
@@ -30,8 +26,8 @@ const faqs: FAQItem[] = [
     answer: 'HumaNet supports multiple roles: HR (full hiring access), Team Lead (project management), CEO (all analytics), Investor (performance insights), and Admin (full system access). Each role sees different dashboard views and analytics.'
   },
   {
-    question: 'How to configure ATS settings?',
-    answer: 'Go to Settings > ATS Configuration tab. Here you can set default threshold values and manage skills keyword list that the ATS algorithm uses for scoring resumes.'
+    question: 'How to filter candidates in HireSmart?',
+    answer: 'Use the filter panel to narrow candidates by status (pending, shortlisted, rejected) and skills. You can add multiple skill filters to find candidates with all required skills.'
   }
 ];
 
@@ -137,7 +133,7 @@ export const HelpInfo: React.FC = () => {
                 <div className="bg-gray-50 p-4 rounded-lg mt-4">
                   <p className="font-medium text-gray-900">Key Features:</p>
                   <ul className="mt-2 space-y-1 text-gray-700 text-sm">
-                    <li>✓ AI Resume Parsing with ATS Scoring</li>
+                    <li>✓ AI Resume Parsing with Skill Insights</li>
                     <li>✓ Smart Project Staffing Recommendations</li>
                     <li>✓ Salary Benchmarking & Predictions</li>
                     <li>✓ Real-time Analytics & Insights</li>

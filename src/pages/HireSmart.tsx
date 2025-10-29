@@ -13,19 +13,13 @@ interface Candidate {
   ctc: number;
   location: string;
   domain: string;
-  atsScore: number;
   status: 'pending' | 'shortlisted' | 'rejected';
   education: string;
 }
 
-const MIN_ATS_THRESHOLD = 60;
-const MAX_ATS_THRESHOLD = 90;
-const DEFAULT_ATS_THRESHOLD = 70;
-
 export const HireSmart: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [atsThreshold, setAtsThreshold] = useState(DEFAULT_ATS_THRESHOLD);
   const [skillFilters, setSkillFilters] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
@@ -59,7 +53,6 @@ export const HireSmart: React.FC = () => {
           ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
           location: candidate.location ?? 'Bangalore',
           domain: candidate.domain ?? 'General',
-          atsScore: Number(candidate.atsScore ?? candidate.ats_score ?? 60),
           status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
           education: candidate.education ?? 'Not specified'
         }));
@@ -107,7 +100,6 @@ export const HireSmart: React.FC = () => {
           ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
           location: candidate.location ?? 'Bangalore',
           domain: candidate.domain ?? 'General',
-          atsScore: Number(candidate.atsScore ?? candidate.ats_score ?? 60),
           status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
           education: candidate.education ?? 'Not specified'
         }));
@@ -130,7 +122,6 @@ export const HireSmart: React.FC = () => {
         ctc: Math.floor(Math.random() * 1000000) + 500000,
         location: ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
         domain: ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
-        atsScore: Math.floor(Math.random() * 40) + 60,
         status: 'pending',
         education: 'B.Tech Computer Science'
       }));
@@ -234,7 +225,6 @@ export const HireSmart: React.FC = () => {
 
   const handleResetFilters = () => {
     setFilterStatus('all');
-    setAtsThreshold(DEFAULT_ATS_THRESHOLD);
     setSkillFilters([]);
     setSkillInput('');
   };
@@ -253,28 +243,18 @@ export const HireSmart: React.FC = () => {
     setSkillFilters(skillFilters.filter(s => s !== skill));
   };
 
-  const filteredCandidates = candidates
-    .filter(c => {
-      if (filterStatus !== 'all' && c.status !== filterStatus) return false;
-      if (c.atsScore < atsThreshold) return false;
-      if (skillFilters.length > 0) {
-        const hasAllSkills = skillFilters.every(filterSkill =>
-          c.skills.some(candidateSkill =>
-            candidateSkill.toLowerCase().includes(filterSkill.toLowerCase())
-          )
-        );
-        if (!hasAllSkills) return false;
-      }
-      return true;
-    })
-    .sort((a, b) => b.atsScore - a.atsScore);
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 bg-green-100';
-    if (score >= 70) return 'text-blue-600 bg-blue-100';
-    if (score >= 60) return 'text-orange-600 bg-orange-100';
-    return 'text-red-600 bg-red-100';
-  };
+  const filteredCandidates = candidates.filter(c => {
+    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+    if (skillFilters.length > 0) {
+      const hasAllSkills = skillFilters.every(filterSkill =>
+        c.skills.some(candidateSkill =>
+          candidateSkill.toLowerCase().includes(filterSkill.toLowerCase())
+        )
+      );
+      if (!hasAllSkills) return false;
+    }
+    return true;
+  });
 
   return (
     <Layout>
@@ -282,7 +262,7 @@ export const HireSmart: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold">HireSmart</h1>
-            <p className="text-gray-600 mt-1">Resume parsing & ATS scoring</p>
+            <p className="text-gray-600 mt-1">Resume parsing & candidate management</p>
           </div>
           <div className="flex items-center space-x-3">
             {candidates.length > 0 && (
@@ -337,19 +317,6 @@ export const HireSmart: React.FC = () => {
                 </select>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">ATS Threshold:</label>
-                <input
-                  type="range"
-                  min={MIN_ATS_THRESHOLD}
-                  max={MAX_ATS_THRESHOLD}
-                  value={atsThreshold}
-                  onChange={e => setAtsThreshold(Number(e.target.value))}
-                  className="w-32"
-                />
-                <span className="text-sm font-semibold text-blue-600">{atsThreshold}%</span>
-              </div>
-
               <div className="ml-auto text-sm text-gray-600 text-right flex items-center gap-3">
                 <div>
                   <p>
@@ -357,11 +324,11 @@ export const HireSmart: React.FC = () => {
                   </p>
                   {skillFilters.length > 0 && (
                     <p className="text-xs text-indigo-600 font-medium mt-1">
-                      Filtering by {skillFilters.length} skill{skillFilters.length > 1 ? 's' : ''} · Sorted by ATS score
+                      Filtering by {skillFilters.length} skill{skillFilters.length > 1 ? 's' : ''}
                     </p>
                   )}
                 </div>
-                {(filterStatus !== 'all' || atsThreshold !== DEFAULT_ATS_THRESHOLD || skillFilters.length > 0) && (
+                {(filterStatus !== 'all' || skillFilters.length > 0) && (
                   <button
                     onClick={handleResetFilters}
                     className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
@@ -435,7 +402,7 @@ export const HireSmart: React.FC = () => {
             <p className="text-gray-600 mb-6">
               {candidates.length === 0
                 ? 'Upload resumes to get started with AI-powered candidate screening.'
-                : 'No candidates match the current filters. Try adjusting the status, ATS threshold, or skill search to see more results.'}
+                : 'No candidates match the current filters. Try adjusting the status or skill search to see more results.'}
             </p>
             {candidates.length === 0 ? (
               <Button onClick={() => fileInputRef.current?.click()} variant="primary">
@@ -468,9 +435,6 @@ export const HireSmart: React.FC = () => {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{candidate.name}</h3>
                       <p className="text-sm text-gray-600">{candidate.domain}</p>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${getScoreColor(candidate.atsScore)}`}>
-                      {candidate.atsScore}%
                     </div>
                   </div>
 
@@ -608,12 +572,6 @@ export const HireSmart: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-500">Location</p>
                       <p className="text-gray-900">{selectedCandidate.location}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">ATS Score</p>
-                      <p className={`text-lg font-semibold ${getScoreColor(selectedCandidate.atsScore)}`}>
-                        {selectedCandidate.atsScore}%
-                      </p>
                     </div>
                   </div>
                   <div>
