@@ -739,6 +739,242 @@ app.put('/api/settings/ats', authenticate, (req, res) => {
   res.json({ success: true, data: { atsThreshold: companySettings.atsThreshold, skillsKeywords: companySettings.skillsKeywords } });
 });
 
+let externalCandidates = [];
+
+const calculateMatchScore = (candidate, searchFilters) => {
+  let score = 0;
+  const candidateSkills = candidate.skills.map(s => s.toLowerCase());
+  const requiredSkills = searchFilters.skills.map(s => s.toLowerCase());
+  
+  if (requiredSkills.length > 0) {
+    const matchedSkills = requiredSkills.filter(skill => 
+      candidateSkills.some(cs => cs.includes(skill) || skill.includes(cs))
+    );
+    score += (matchedSkills.length / requiredSkills.length) * 60;
+  } else {
+    score += 50;
+  }
+  
+  const expMin = searchFilters.experience.min;
+  const expMax = searchFilters.experience.max;
+  if (candidate.experience >= expMin && candidate.experience <= expMax) {
+    score += 30;
+  } else if (candidate.experience >= expMin - 1 && candidate.experience <= expMax + 1) {
+    score += 15;
+  }
+  
+  if (searchFilters.location && candidate.location.toLowerCase().includes(searchFilters.location.toLowerCase())) {
+    score += 10;
+  }
+  
+  return Math.min(Math.round(score), 100);
+};
+
+const generateMockLinkedInCandidates = (filters, count = 5) => {
+  const names = [
+    'Rajesh Kumar', 'Priya Sharma', 'Amit Patel', 'Neha Singh', 'Vikram Reddy',
+    'Anjali Verma', 'Rahul Gupta', 'Sneha Desai', 'Karthik Iyer', 'Pooja Mehta',
+    'Arjun Nair', 'Divya Rao', 'Sanjay Joshi', 'Kavita Menon', 'Ravi Kumar'
+  ];
+  
+  const companies = ['Google', 'Amazon', 'Microsoft', 'TCS', 'Infosys', 'Wipro', 'Accenture', 'IBM', 'Oracle', 'SAP'];
+  const roles = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'Full Stack Developer', 'Frontend Engineer', 'Backend Developer', 'DevOps Engineer'];
+  const locations = ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune', 'Delhi', 'Chennai', 'Gurgaon', 'Noida'];
+  const educations = ['B.Tech Computer Science', 'M.Tech Software Engineering', 'B.E. Information Technology', 'MCA', 'B.Sc. Computer Science'];
+  
+  const allSkills = ['React', 'Node.js', 'Python', 'Java', 'AWS', 'Docker', 'Kubernetes', 'TypeScript', 'JavaScript', 'MongoDB', 'PostgreSQL', 'GraphQL', 'Redis', 'Microservices', 'CI/CD'];
+  
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const name = names[Math.floor(Math.random() * names.length)];
+    const experience = Math.floor(Math.random() * (filters.experience.max - filters.experience.min + 1)) + filters.experience.min;
+    
+    let candidateSkills = [...(filters.skills || [])];
+    const additionalSkills = allSkills.filter(s => !candidateSkills.includes(s));
+    const numAdditionalSkills = Math.floor(Math.random() * 5) + 2;
+    for (let j = 0; j < numAdditionalSkills; j++) {
+      const randomSkill = additionalSkills[Math.floor(Math.random() * additionalSkills.length)];
+      if (!candidateSkills.includes(randomSkill)) {
+        candidateSkills.push(randomSkill);
+      }
+    }
+    
+    const candidate = {
+      id: `ext-linkedin-${Date.now()}-${i}`,
+      name,
+      email: `${name.toLowerCase().replace(/\s+/g, '.')}@linkedin.com`,
+      phone: `+91 ${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+      profileUrl: `https://linkedin.com/in/${name.toLowerCase().replace(/\s+/g, '-')}`,
+      skills: candidateSkills,
+      experience,
+      currentCompany: companies[Math.floor(Math.random() * companies.length)],
+      currentRole: roles[Math.floor(Math.random() * roles.length)],
+      location: filters.location || locations[Math.floor(Math.random() * locations.length)],
+      education: educations[Math.floor(Math.random() * educations.length)],
+      bio: `Experienced ${roles[Math.floor(Math.random() * roles.length)]} with ${experience} years in software development. Passionate about building scalable applications.`,
+      source: 'linkedin',
+      atsScore: Math.floor(Math.random() * 30) + 70,
+      availability: ['Immediate', '15 Days', '1 Month', 'Not Specified'][Math.floor(Math.random() * 4)],
+      expectedCtc: Math.floor(Math.random() * 2000000) + 1000000,
+      status: 'discovered'
+    };
+    
+    candidate.matchScore = calculateMatchScore(candidate, filters);
+    results.push(candidate);
+  }
+  
+  return results;
+};
+
+const generateMockNaukriCandidates = (filters, count = 5) => {
+  const names = [
+    'Suresh Kumar', 'Lakshmi Iyer', 'Arun Kumar', 'Deepa Pillai', 'Manoj Singh',
+    'Geetha Krishnan', 'Prakash Reddy', 'Sangeetha Nair', 'Vinod Kumar', 'Radha Menon',
+    'Ramesh Patel', 'Sowmya Rao', 'Kiran Kumar', 'Meena Joshi', 'Sunil Verma'
+  ];
+  
+  const companies = ['Tech Mahindra', 'HCL Technologies', 'L&T Infotech', 'Capgemini', 'Cognizant', 'Mphasis', 'Hexaware', 'Mindtree'];
+  const roles = ['Senior Software Engineer', 'Technical Lead', 'Project Lead', 'Development Manager', 'Architect', 'Principal Engineer'];
+  const locations = ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune', 'Chennai', 'Kolkata', 'Kochi', 'Ahmedabad'];
+  const educations = ['B.Tech Computer Science', 'B.E. Electronics', 'M.Tech Information Technology', 'MCA', 'B.Sc. IT'];
+  
+  const allSkills = ['Java', 'Spring Boot', 'Hibernate', 'React', 'Angular', 'Vue.js', 'Node.js', 'Python', 'Django', 'Flask', 'MySQL', 'Oracle', 'AWS', 'Azure', 'GCP'];
+  
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const name = names[Math.floor(Math.random() * names.length)];
+    const experience = Math.floor(Math.random() * (filters.experience.max - filters.experience.min + 1)) + filters.experience.min;
+    
+    let candidateSkills = [...(filters.skills || [])];
+    const additionalSkills = allSkills.filter(s => !candidateSkills.includes(s));
+    const numAdditionalSkills = Math.floor(Math.random() * 6) + 3;
+    for (let j = 0; j < numAdditionalSkills; j++) {
+      const randomSkill = additionalSkills[Math.floor(Math.random() * additionalSkills.length)];
+      if (!candidateSkills.includes(randomSkill)) {
+        candidateSkills.push(randomSkill);
+      }
+    }
+    
+    const candidate = {
+      id: `ext-naukri-${Date.now()}-${i}`,
+      name,
+      email: `${name.toLowerCase().replace(/\s+/g, '.')}@naukri.com`,
+      phone: `+91 ${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+      profileUrl: `https://naukri.com/profile/${name.toLowerCase().replace(/\s+/g, '-')}`,
+      skills: candidateSkills,
+      experience,
+      currentCompany: companies[Math.floor(Math.random() * companies.length)],
+      currentRole: roles[Math.floor(Math.random() * roles.length)],
+      location: filters.location || locations[Math.floor(Math.random() * locations.length)],
+      education: educations[Math.floor(Math.random() * educations.length)],
+      bio: `Results-driven professional with ${experience} years of expertise in software development and team leadership.`,
+      source: 'naukri',
+      atsScore: Math.floor(Math.random() * 30) + 70,
+      availability: ['Immediate', '15 Days', '1 Month', 'Not Specified'][Math.floor(Math.random() * 4)],
+      expectedCtc: Math.floor(Math.random() * 2000000) + 800000,
+      status: 'discovered'
+    };
+    
+    candidate.matchScore = calculateMatchScore(candidate, filters);
+    results.push(candidate);
+  }
+  
+  return results;
+};
+
+app.post('/api/talent-scout/search', authenticate, (req, res) => {
+  try {
+    const { platform, keywords, location, experience, skills } = req.body;
+    
+    if (!keywords || !keywords.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Keywords are required' 
+      });
+    }
+    
+    const filters = {
+      platform: platform || 'both',
+      keywords: keywords.trim(),
+      location: location || '',
+      experience: experience || { min: 0, max: 15 },
+      skills: skills || []
+    };
+    
+    let results = [];
+    
+    if (filters.platform === 'both' || filters.platform === 'linkedin') {
+      const linkedinResults = generateMockLinkedInCandidates(filters, 5);
+      results = results.concat(linkedinResults);
+    }
+    
+    if (filters.platform === 'both' || filters.platform === 'naukri') {
+      const naukriResults = generateMockNaukriCandidates(filters, 5);
+      results = results.concat(naukriResults);
+    }
+    
+    results.sort((a, b) => b.matchScore - a.matchScore);
+    
+    results.forEach(candidate => {
+      const existing = externalCandidates.find(c => c.id === candidate.id);
+      if (!existing) {
+        externalCandidates.push(candidate);
+      }
+    });
+    
+    res.json({ success: true, data: results });
+  } catch (error) {
+    console.error('Talent scout search error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to search candidates' 
+    });
+  }
+});
+
+app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
+  const invitedCandidates = externalCandidates.filter(c => c.status === 'invited' || c.status === 'applied');
+  res.json({ success: true, data: invitedCandidates });
+});
+
+app.post('/api/talent-scout/invite', authenticate, (req, res) => {
+  try {
+    const { candidateId, jobId, message } = req.body;
+    
+    const candidate = externalCandidates.find(c => c.id === candidateId);
+    
+    if (!candidate) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Candidate not found' 
+      });
+    }
+    
+    candidate.status = 'invited';
+    candidate.invitedAt = new Date();
+    
+    notifications.unshift({
+      id: `notif-${Date.now()}`,
+      message: `Invitation sent to ${candidate.name} from ${candidate.source}`,
+      type: 'talent-scout',
+      read: false,
+      timestamp: new Date()
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Invitation sent successfully to ${candidate.name}`,
+      data: candidate
+    });
+  } catch (error) {
+    console.error('Talent scout invite error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send invitation' 
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`HumaNet backend listening on port ${PORT}`);
 });

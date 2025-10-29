@@ -19,7 +19,22 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Match score algorithm
 - Bulk operations (shortlist, reject, export)
 
-### 3. **AutoMatch - AI-Powered Job Matching**
+### 3. **Talent Scout - External Candidate Search**
+- Search LinkedIn & Naukri.com for external candidates
+- Multi-platform search (both platforms or individually)
+- Advanced filters: keywords, location, experience range, skills
+- AI-powered candidate scoring (ATS + Match scores)
+- Intelligent match score algorithm:
+  - Skills overlap (60% weight)
+  - Experience fit (30% weight)
+  - Location match (10% weight)
+- Personalized candidate invitations
+- Track invitation status (discovered → invited → applied)
+- Save and manage external candidates
+- Real-time notifications on invitations
+- View external profiles with one click
+
+### 4. **AutoMatch - AI-Powered Job Matching**
 - Create job postings with requirements
 - AI algorithm matches candidates to jobs
 - Display top matches with scores
@@ -27,7 +42,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - CTC fit indicators
 - Notice period compatibility checks
 
-### 4. **Document Fraud Detection**
+### 5. **Document Fraud Detection**
 - Upload ID proofs and certificates
 - Metadata verification
 - Font consistency checks
@@ -35,7 +50,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Fraud risk scoring (0-100)
 - Color-coded status (Green/Yellow/Red)
 
-### 5. **Offer Management**
+### 6. **Offer Management**
 - Create and track job offers
 - Auto-calculate hike percentage
 - Offer shopping detection
@@ -43,7 +58,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Offer status tracking (pending, accepted, rejected)
 - Offer analytics dashboard
 
-### 6. **Hike Expectation Analyzer**
+### 7. **Hike Expectation Analyzer**
 - Analyze hike expectations vs market benchmarks
 - Calculate market average CTC
 - Retention risk assessment
@@ -51,7 +66,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Counter-offer suggestions
 - Visual analytics (charts & graphs)
 
-### 7. **Salary Prediction (AI Feature)**
+### 8. **Salary Prediction (AI Feature)**
 - ML-based salary prediction
 - Input: skills, experience, education, location, company size
 - Confidence interval display
@@ -59,7 +74,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Market competitiveness score
 - Negotiation range suggestions
 
-### 8. **HR Assistance (AI Chatbot)**
+### 9. **HR Assistance (AI Chatbot)**
 - Natural language query processing
 - Answer HR policy questions
 - Team composition suggestions
