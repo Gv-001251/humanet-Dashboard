@@ -41,11 +41,11 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-64 min-h-screen flex flex-col relative bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600">
+    <div className="w-64 h-screen sticky top-0 flex flex-col relative bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 shadow-xl">
       <div className="absolute inset-0 backdrop-blur-xl bg-white/10"></div>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
-      
-      <div className="relative z-10 flex flex-col min-h-screen text-white">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+
+      <div className="relative z-10 flex flex-col h-full text-white">
         {/* Logo */}
         <div className="p-6 border-b border-white/20">
           <div className="flex items-center space-x-2">
