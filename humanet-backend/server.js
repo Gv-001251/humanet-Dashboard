@@ -1951,8 +1951,6 @@ const calculateMatchScore = (candidate, searchFilters) => {
       score += 15;
     } else if (status === 'negotiable') {
       score += 12;
-    } else if (status === 'stretch') {
-      score += 6;
     }
 
     score += Math.min(10, normalizedFit / 10);

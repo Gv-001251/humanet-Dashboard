@@ -483,10 +483,6 @@ function checkSalaryFit(expectedSalary, budgetRange) {
       fitPercentage = 90;
       status = 'negotiable';
       message = `Candidate expects ${percentAbove.toFixed(0)}% more (negotiable range)`;
-    } else if (percentAbove <= 20) {
-      fitPercentage = 70;
-      status = 'stretch';
-      message = `Candidate expects ${percentAbove.toFixed(0)}% more (requires approval)`;
     } else {
       fitPercentage = 40;
       status = 'above-budget';

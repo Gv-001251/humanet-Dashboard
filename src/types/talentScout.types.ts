@@ -8,7 +8,7 @@ export interface SalaryRange {
 export interface SalaryFit {
   fits: boolean;
   fitPercentage: number;
-  status: 'perfect-match' | 'below-budget' | 'negotiable' | 'stretch' | 'above-budget' | 'no-match' | 'unknown';
+  status: 'perfect-match' | 'below-budget' | 'negotiable' | 'above-budget' | 'no-match' | 'unknown';
   message: string;
   difference: number;
   expectedSalary: number;
