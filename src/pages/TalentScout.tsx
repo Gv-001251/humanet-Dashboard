@@ -282,8 +282,6 @@ export const TalentScout: React.FC = () => {
         return 'bg-green-50 text-green-700 border-green-200';
       case 'negotiable':
         return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'stretch':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
       case 'above-budget':
         return 'bg-red-50 text-red-600 border-red-200';
       default:
@@ -299,8 +297,6 @@ export const TalentScout: React.FC = () => {
         return 'Below Budget';
       case 'negotiable':
         return 'Negotiable Fit';
-      case 'stretch':
-        return 'Stretch Fit';
       case 'above-budget':
         return 'Above Budget';
       default:
