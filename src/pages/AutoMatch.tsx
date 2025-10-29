@@ -1003,7 +1003,8 @@ export const AutoMatch: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
 
                     {project.status === 'assigned' && (
@@ -1022,7 +1023,8 @@ export const AutoMatch: React.FC = () => {
                   </div>
                 )}
               </div>
-            });
+            );
+          })
           )}
         </div>
 

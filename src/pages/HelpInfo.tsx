@@ -11,19 +11,19 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: 'How to upload resumes?',
-    answer: 'Go to HireSmart page, click "Upload Resumes" button, and select PDF or DOCX files from your computer. You can upload multiple resumes at once. The system will automatically parse and extract candidate information.'
+    answer: 'Go to HireSmart page, click "Upload Resumes" button, and select PDF, DOCX, or CSV files from your computer. You can upload multiple files at once.'
   },
   {
     question: 'What is ATS score?',
-    answer: 'ATS (Applicant Tracking System) score is an AI-calculated percentage (0-100%) that measures how well a candidate\'s resume matches the job requirements. It considers skills, experience, education, and other factors. A score above 70% is generally considered good.'
+    answer: 'ATS (Applicant Tracking System) score is an AI-calculated percentage (0-100%) that measures how well a candidate\'s resume matches the job requirements. A score above 70% is generally considered good.'
   },
   {
     question: 'How does AutoMatch work?',
-    answer: 'AutoMatch uses AI to analyze project requirements and employee skills/availability to recommend the best team composition. It calculates match scores based on skill overlap, experience fit, and current availability status.'
+    answer: 'AutoMatch analyzes project requirements and employee skills/availability to recommend the best team composition.'
   },
   {
     question: 'How to predict salaries?',
-    answer: 'Navigate to Salary Analysis, fill in the form with role, skills, experience, location, and other details. Click "Predict Salary" to get Min-Ideal-Max salary ranges along with breakdown and regional comparison charts.'
+    answer: 'Navigate to Salary Analysis, fill in the form with role, skills, experience, location, and other details. Click "Predict Salary" to get salary range predictions.'
   },
   {
     question: 'What are role permissions?',
