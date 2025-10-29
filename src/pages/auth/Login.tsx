@@ -142,12 +142,12 @@ export const Login: React.FC = () => {
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="font-medium text-gray-700">HR Account</p>
                 <p className="text-gray-600">Email: hr@humanet.com</p>
-                <p className="text-gray-600">Password: hr123</p>
+                <p className="text-gray-600">Password: Hr@Secure123</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-700">Employee Account</p>
-                <p className="text-gray-600">Email: employee@humanet.com</p>
-                <p className="text-gray-600">Password: emp123</p>
+                <p className="font-medium text-gray-700">Admin Account</p>
+                <p className="text-gray-600">Email: admin@humanet.com</p>
+                <p className="text-gray-600">Password: Admin@Secure123</p>
               </div>
             </div>
           </div>

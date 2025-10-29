@@ -1,17 +1,10 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('humanet_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
-};
-
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
+    credentials: 'include',
     headers: {
-      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
       ...options.headers
     },
     ...options

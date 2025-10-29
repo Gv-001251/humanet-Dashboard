@@ -6,13 +6,12 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (partial: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_TOKEN_KEY = 'humanet_token';
 const STORAGE_USER_KEY = 'humanet_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -21,28 +20,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(STORAGE_TOKEN_KEY);
-    const storedUser = localStorage.getItem(STORAGE_USER_KEY);
+    const checkAuth = async () => {
+      const storedUser = localStorage.getItem(STORAGE_USER_KEY);
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      try {
-        const parsedUser = JSON.parse(storedUser) as User;
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Failed to parse stored user', error);
-        localStorage.removeItem(STORAGE_USER_KEY);
-        localStorage.removeItem(STORAGE_TOKEN_KEY);
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser) as User;
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/me`, {
+            method: 'GET',
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+            setToken('cookie-based');
+          } else {
+            localStorage.removeItem(STORAGE_USER_KEY);
+          }
+        } catch (error) {
+          console.error('Failed to verify session', error);
+          localStorage.removeItem(STORAGE_USER_KEY);
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify(credentials),
+      credentials: 'include'
     });
 
     if (!response.ok) {
@@ -52,16 +64,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const data = await response.json() as LoginResponse;
 
-    setToken(data.token);
+    setToken('cookie-based');
     setUser(data.user);
-    localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
     localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
     setToken(null);
     setUser(null);
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
     localStorage.removeItem(STORAGE_USER_KEY);
   };
 
