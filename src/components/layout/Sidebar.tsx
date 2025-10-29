@@ -41,69 +41,73 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-64 h-screen sticky top-0 flex flex-col relative bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 shadow-xl">
-      <div className="absolute inset-0 backdrop-blur-xl bg-white/10"></div>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-
-      <div className="relative z-10 flex flex-col h-full text-white">
+    <div className="sticky top-0 flex h-screen w-64 flex-col border-r border-neutral-border bg-white shadow-subtle relative">
+      <div className="flex flex-col">
         {/* Logo */}
-        <div className="p-6 border-b border-white/20">
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-white/30">
-              <UserIcon className="w-6 h-6 text-white" />
+        <div className="border-b border-neutral-border p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary text-white shadow-sm">
+              <UserIcon className="h-6 w-6" />
             </div>
-            <span className="text-xl font-bold text-white drop-shadow-lg">HumaNet</span>
+            <div className="flex flex-col">
+              <span className="text-base font-bold tracking-tight text-neutral-text">HumaNet</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-muted">Intelligence</span>
+            </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {menuItems.map(item => (
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {menuItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               title={item.tooltip || item.label}
               className={({ isActive }) =>
-                `flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-gentle ${
                   isActive
-                    ? 'bg-white/25 backdrop-blur-md text-white shadow-lg border border-white/40'
-                    : 'text-white/80 hover:bg-white/15 hover:backdrop-blur-md hover:text-white hover:shadow-md'
+                    ? 'bg-brand-primary/10 text-brand-primary shadow-sm'
+                    : 'text-neutral-subtler hover:bg-slate-50 hover:text-neutral-text'
                 }`
               }
             >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              <item.icon className="h-5 w-5" />
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         {/* User Profile & Logout */}
-        <div className="p-4 border-t border-white/20">
+        <div className="border-t border-neutral-border p-4">
           <div className="relative">
             <button
-              onClick={() => setShowProfileDropdown(prev => !prev)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-white/15 backdrop-blur-md transition-all duration-200"
+              onClick={() => setShowProfileDropdown((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all duration-200 ease-gentle hover:bg-slate-50"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-white/30 to-white/10 rounded-full flex items-center justify-center shadow-lg border border-white/30">
-                  <UserIcon className="w-5 h-5 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary/10 text-sm font-semibold text-brand-primary">
+                  {user?.name ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : 'U'}
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium text-white">{user?.name || 'User'}</p>
-                  <p className="text-xs text-white/70 capitalize">{user?.role || 'Role'}</p>
+                  <p className="text-sm font-semibold text-neutral-text">{user?.name || 'User'}</p>
+                  <p className="text-xs text-neutral-muted capitalize">{user?.role || 'Role'}</p>
                 </div>
               </div>
-              <ChevronDown className={`w-4 h-4 text-white/80 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`h-4 w-4 text-neutral-muted transition-transform ${
+                  showProfileDropdown ? 'rotate-180' : ''
+                }`}
+              />
             </button>
 
             {showProfileDropdown && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/20 backdrop-blur-xl rounded-xl shadow-2xl overflow-hidden border border-white/30">
+              <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-neutral-border bg-white shadow-subtle">
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-white/20 transition-colors text-red-300 hover:text-red-200"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-semantic-error transition-colors hover:bg-red-50"
                 >
-                  <LogOut className="w-5 h-5" />
-                  <span className="font-medium">Logout</span>
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
                 </button>
               </div>
             )}
@@ -111,13 +115,17 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {showLogoutConfirm && (
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white text-gray-900 rounded-2xl shadow-2xl p-6 w-80 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-2">Confirm Logout</h3>
-              <p className="text-sm text-gray-600 mb-4">Are you sure you want to logout?</p>
-              <div className="flex items-center justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>Cancel</Button>
-                <Button variant="primary" onClick={handleLogout}>Logout</Button>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="w-80 rounded-xl border border-neutral-border bg-white p-6 shadow-subtle">
+              <h3 className="mb-1 text-lg font-semibold text-neutral-text">Confirm Logout</h3>
+              <p className="mb-6 text-sm text-neutral-subtler">Are you sure you want to logout?</p>
+              <div className="flex items-center justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={handleLogout}>
+                  Logout
+                </Button>
               </div>
             </div>
           </div>
