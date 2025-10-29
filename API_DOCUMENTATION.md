@@ -263,7 +263,7 @@ Updates a candidate's information.
 ```
 
 ### Update Candidate Status
-Updates only the application status.
+Updates only the application status and triggers candidate email notifications.
 
 **Endpoint:** `PUT /candidates/:id/status`
 
@@ -273,13 +273,31 @@ Updates only the application status.
   "status": "shortlisted"
 }
 ```
+- `status` must be one of: `"pending"`, `"shortlisted"`, `"rejected"`
 
 **Response:**
 ```json
 {
-  "message": "Candidate status updated successfully"
+  "success": true,
+  "data": {
+    "id": "cand-1",
+    "name": "Amit Kumar",
+    "email": "amit.kumar@example.com",
+    "phone": "+91 9876543210",
+    "skills": ["React", "TypeScript", "Node.js"],
+    "status": "shortlisted"
+  },
+  "meta": {
+    "emailAttempted": true,
+    "emailSent": true,
+    "emailMessageId": "<message-id>"
+  }
 }
 ```
+
+**Notes:**
+- The `meta` object is included only when an email notification is attempted.
+- If email delivery fails or is disabled, `emailSent` will be `false` and `emailMessage` will describe the reason.
 
 ### Bulk Candidate Operations
 Performs bulk operations on multiple candidates.

@@ -15,6 +15,7 @@ const {
   formatSalary,
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
+const { sendShortlistEmail, sendRejectionEmail } = require('./src/services/emailService');
 
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
@@ -1347,6 +1348,13 @@ app.put('/api/candidates/:id/status', async (req, res) => {
 
   try {
     const { status } = req.body;
+    const normalizedStatus = typeof status === 'string' ? status.trim().toLowerCase() : '';
+
+    const validStatuses = ['pending', 'shortlisted', 'rejected'];
+    if (!normalizedStatus || !validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
     let candidate = candidates.find(c => c.id === candidateId);
 
     if (!candidate && candidateCollection) {
@@ -1361,13 +1369,15 @@ app.put('/api/candidates/:id/status', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Candidate not found' });
     }
 
-    candidate.status = status;
+    const previousStatus = candidate.status;
+
+    candidate.status = normalizedStatus;
 
     if (candidateCollection) {
       try {
         await candidateCollection.updateOne(
           { id: candidateId },
-          { $set: { status } }
+          { $set: { status: normalizedStatus } }
         );
         await refreshCandidatesFromDB();
         const refreshedCandidate = candidates.find(c => c.id === candidateId);
@@ -1379,7 +1389,7 @@ app.put('/api/candidates/:id/status', async (req, res) => {
       }
     }
 
-    if (status === 'shortlisted') {
+    if (normalizedStatus === 'shortlisted' && previousStatus !== 'shortlisted') {
       notifications.unshift({
         id: `notif-${Date.now()}`,
         message: `Candidate ${candidate.name} shortlisted`,
@@ -1389,7 +1399,53 @@ app.put('/api/candidates/:id/status', async (req, res) => {
       });
     }
 
-    res.json({ success: true, data: candidate });
+    let emailResult = null;
+    const shouldSendEmail =
+      previousStatus !== normalizedStatus && ['shortlisted', 'rejected'].includes(normalizedStatus);
+
+    if (shouldSendEmail && candidate?.email) {
+      const candidateForEmail = { ...candidate };
+
+      try {
+        emailResult =
+          normalizedStatus === 'shortlisted'
+            ? await sendShortlistEmail(candidateForEmail)
+            : await sendRejectionEmail(candidateForEmail);
+
+        if (!emailResult?.success) {
+          const message = emailResult?.message || 'Unknown error';
+          console.warn(`Failed to send ${normalizedStatus} email to ${candidate.email}: ${message}`);
+        }
+      } catch (emailError) {
+        emailResult = { success: false, message: emailError.message };
+        console.error(`Error sending ${normalizedStatus} email to ${candidate.email}:`, emailError);
+      }
+    } else if (shouldSendEmail && !candidate?.email) {
+      emailResult = {
+        success: false,
+        message: 'Candidate email address is not available'
+      };
+      console.warn(`Skipping ${normalizedStatus} email for candidate ${candidate.id} - email not available`);
+    }
+
+    const responsePayload = { success: true, data: candidate };
+
+    if (shouldSendEmail) {
+      responsePayload.meta = {
+        emailAttempted: true,
+        emailSent: Boolean(emailResult?.success)
+      };
+
+      if (emailResult?.messageId) {
+        responsePayload.meta.emailMessageId = emailResult.messageId;
+      }
+
+      if (emailResult?.message) {
+        responsePayload.meta.emailMessage = emailResult.message;
+      }
+    }
+
+    res.json(responsePayload);
   } catch (error) {
     console.error('Failed to update candidate status:', error);
     res.status(500).json({ success: false, message: 'Failed to update candidate status' });
