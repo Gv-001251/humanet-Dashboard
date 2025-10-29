@@ -7,6 +7,12 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
 const { connectDB, getDB } = require('./src/config/mongodb');
+const {
+  predictSalary,
+  getMarketComparison,
+  checkSalaryFit,
+  formatSalary
+} = require('./src/services/salaryPredictionEngine');
 
 const uploadsDir = path.join(__dirname, 'uploads');
 
@@ -1917,8 +1923,115 @@ const calculateMatchScore = (candidate, searchFilters) => {
   if (searchFilters.location && candidate.location.toLowerCase().includes(searchFilters.location.toLowerCase())) {
     score += 10;
   }
+
+  if (
+    searchFilters.salaryBudget &&
+    candidate.salaryInsights &&
+    candidate.salaryInsights.salaryFit
+  ) {
+    const { status, fitPercentage } = candidate.salaryInsights.salaryFit;
+    const normalizedFit = Math.max(0, Math.min(120, fitPercentage));
+
+    if (status === 'perfect-match') {
+      score += 20;
+    } else if (status === 'below-budget') {
+      score += 15;
+    } else if (status === 'negotiable') {
+      score += 12;
+    } else if (status === 'stretch') {
+      score += 6;
+    }
+
+    score += Math.min(10, normalizedFit / 10);
+  }
   
   return Math.min(Math.round(score), 100);
+};
+
+/**
+ * Build salary insights for a candidate using the salary prediction engine
+ */
+const buildSalaryInsights = (candidate, searchFilters) => {
+  const targetRole =
+    searchFilters.jobTitle ||
+    candidate.currentRole ||
+    searchFilters.keywords ||
+    'Software Engineer';
+  const targetIndustry = searchFilters.industry || 'IT/Tech';
+  const targetLocation = candidate.location || searchFilters.location || 'Bangalore';
+  const targetCompanySize = searchFilters.companySize || 'SME';
+
+  const prediction = predictSalary({
+    experience: candidate.experience,
+    role: targetRole,
+    location: targetLocation,
+    industry: targetIndustry,
+    skills: candidate.skills,
+    companySize: targetCompanySize
+  });
+
+  const baseAmount = prediction.salaryRange.average;
+  const variation = Math.random() * 0.25 - 0.1; // -10% to +15%
+  const expectedCtc = Math.max(
+    Math.round(baseAmount * (1 + variation)),
+    prediction.salaryRange.min
+  );
+
+  let salaryFit = null;
+  if (
+    searchFilters.salaryBudget &&
+    typeof searchFilters.salaryBudget.min === 'number' &&
+    typeof searchFilters.salaryBudget.max === 'number'
+  ) {
+    salaryFit = checkSalaryFit(expectedCtc, searchFilters.salaryBudget);
+  }
+
+  const marketComparisons = getMarketComparison({
+    experience: candidate.experience,
+    role: targetRole,
+    location: searchFilters.location || candidate.location || targetLocation,
+    industry: targetIndustry,
+    skills: candidate.skills,
+    companySize: targetCompanySize
+  }).map(entry => ({
+    label: entry.companySize || entry.location,
+    type: entry.companySize ? 'companySize' : 'location',
+    salaryRange: entry.salaryRange,
+    multiplier: entry.multiplier
+  }));
+
+  candidate.expectedCtc = expectedCtc;
+  candidate.salaryInsights = {
+    predictedRange: prediction.salaryRange,
+    breakdown: prediction.breakdown,
+    salaryFit,
+    marketComparisons,
+    formatted: {
+      predictedMin: formatSalary(prediction.salaryRange.min),
+      predictedMax: formatSalary(prediction.salaryRange.max),
+      predictedAverage: formatSalary(prediction.salaryRange.average),
+      expectedCtc: formatSalary(expectedCtc),
+      budgetMin: salaryFit?.budgetRange?.min ? formatSalary(salaryFit.budgetRange.min) : null,
+      budgetMax: salaryFit?.budgetRange?.max ? formatSalary(salaryFit.budgetRange.max) : null
+    },
+    summary: salaryFit ? salaryFit.message : 'No budget provided for salary matching',
+    recommendation: salaryFit
+      ? salaryFit.fits
+        ? 'Candidate expectation is within your budget range.'
+        : salaryFit.status === 'below-budget'
+          ? 'Candidate expects below your budget—consider increasing offer for retention.'
+          : salaryFit.status === 'negotiable'
+            ? 'Candidate slightly exceeds budget; consider negotiation or perks.'
+            : 'Candidate exceeds budget—requires approval to proceed.'
+      : 'Provide a salary budget to unlock fit analysis.'
+  };
+
+  if (salaryFit) {
+    candidate.salaryFitStatus = salaryFit.status;
+    candidate.salaryFitPercentage = salaryFit.fitPercentage;
+  }
+
+  return candidate;
 };
 
 const generateMockLinkedInCandidates = (filters, count = 5) => {
@@ -1950,6 +2063,11 @@ const generateMockLinkedInCandidates = (filters, count = 5) => {
       }
     }
     
+    const selectedRole =
+      filters.jobTitle || roles[Math.floor(Math.random() * roles.length)];
+    const selectedLocation =
+      filters.location || locations[Math.floor(Math.random() * locations.length)];
+
     const candidate = {
       id: `ext-linkedin-${Date.now()}-${i}`,
       name,
@@ -1961,17 +2079,17 @@ const generateMockLinkedInCandidates = (filters, count = 5) => {
       skills: candidateSkills,
       experience,
       currentCompany: companies[Math.floor(Math.random() * companies.length)],
-      currentRole: roles[Math.floor(Math.random() * roles.length)],
-      location: filters.location || locations[Math.floor(Math.random() * locations.length)],
+      currentRole: selectedRole,
+      location: selectedLocation,
       education: educations[Math.floor(Math.random() * educations.length)],
-      bio: `Experienced ${roles[Math.floor(Math.random() * roles.length)]} with ${experience} years in software development. Passionate about building scalable applications.`,
+      bio: `Experienced ${selectedRole} with ${experience} years in software development. Passionate about building scalable applications.`,
       source: 'linkedin',
       atsScore: Math.floor(Math.random() * 30) + 70,
       availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
-      expectedCtc: Math.floor(Math.random() * 2000000) + 1000000,
       status: 'discovered'
     };
-    
+
+    buildSalaryInsights(candidate, filters);
     candidate.matchScore = calculateMatchScore(candidate, filters);
     results.push(candidate);
   }
@@ -2008,6 +2126,11 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
       }
     }
     
+    const selectedRole =
+      filters.jobTitle || roles[Math.floor(Math.random() * roles.length)];
+    const selectedLocation =
+      filters.location || locations[Math.floor(Math.random() * locations.length)];
+
     const candidate = {
       id: `ext-naukri-${Date.now()}-${i}`,
       name,
@@ -2019,17 +2142,17 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
       skills: candidateSkills,
       experience,
       currentCompany: companies[Math.floor(Math.random() * companies.length)],
-      currentRole: roles[Math.floor(Math.random() * roles.length)],
-      location: filters.location || locations[Math.floor(Math.random() * locations.length)],
+      currentRole: selectedRole,
+      location: selectedLocation,
       education: educations[Math.floor(Math.random() * educations.length)],
       bio: `Results-driven professional with ${experience} years of expertise in software development and team leadership.`,
       source: 'naukri',
       atsScore: Math.floor(Math.random() * 30) + 70,
       availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
-      expectedCtc: Math.floor(Math.random() * 2000000) + 800000,
       status: 'discovered'
     };
-    
+
+    buildSalaryInsights(candidate, filters);
     candidate.matchScore = calculateMatchScore(candidate, filters);
     results.push(candidate);
   }
@@ -2039,7 +2162,17 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
 
 app.post('/api/talent-scout/search', authenticate, (req, res) => {
   try {
-    const { platform, keywords, location, experience, skills } = req.body;
+    const {
+      platform,
+      keywords,
+      location,
+      experience,
+      skills = [],
+      salaryBudget,
+      jobTitle,
+      industry,
+      companySize
+    } = req.body;
     
     if (!keywords || !keywords.trim()) {
       return res.status(400).json({ 
@@ -2048,41 +2181,169 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
       });
     }
     
+    const normalizeBudgetValue = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      const numeric = Number(value);
+      if (Number.isNaN(numeric)) {
+        return null;
+      }
+      return numeric <= 1000 ? Math.round(numeric * 100000) : Math.round(numeric);
+    };
+    
+    let parsedBudget = null;
+    if (salaryBudget && typeof salaryBudget === 'object') {
+      const minBudget = normalizeBudgetValue(salaryBudget.min);
+      const maxBudget = normalizeBudgetValue(salaryBudget.max);
+      
+      if (minBudget !== null && maxBudget !== null && maxBudget > 0) {
+        parsedBudget = {
+          min: Math.min(minBudget, maxBudget),
+          max: Math.max(minBudget, maxBudget),
+          includeNegotiable: salaryBudget.includeNegotiable !== false
+        };
+      }
+    }
+    
+    const experienceRange = experience && typeof experience === 'object'
+      ? {
+          min: typeof experience.min === 'number' ? experience.min : 0,
+          max: typeof experience.max === 'number' ? experience.max : 15
+        }
+      : { min: 0, max: 15 };
+    
     const filters = {
       platform: platform || 'both',
       keywords: keywords.trim(),
       location: location || '',
-      experience: experience || { min: 0, max: 15 },
-      skills: skills || []
+      experience: experienceRange,
+      skills: Array.isArray(skills) ? skills : [],
+      salaryBudget: parsedBudget,
+      jobTitle: jobTitle || keywords.trim(),
+      industry: industry || 'IT/Tech',
+      companySize: companySize || 'SME'
     };
     
     let results = [];
     const resultsPerPlatform = req.body.resultsPerPlatform || 20;
     
     if (filters.platform === 'both' || filters.platform === 'linkedin') {
-      const linkedinResults = generateMockLinkedInCandidates(filters, resultsPerPlatform);
-      results = results.concat(linkedinResults);
+      results = results.concat(generateMockLinkedInCandidates(filters, resultsPerPlatform));
     }
     
     if (filters.platform === 'both' || filters.platform === 'naukri') {
-      const naukriResults = generateMockNaukriCandidates(filters, resultsPerPlatform);
-      results = results.concat(naukriResults);
+      results = results.concat(generateMockNaukriCandidates(filters, resultsPerPlatform));
     }
     
-    results.sort((a, b) => b.matchScore - a.matchScore);
-    
-    const availableResults = results.filter(candidate => 
+    let filteredResults = results.filter(candidate => 
       AVAILABLE_AVAILABILITY_STATUSES.has(candidate.availability)
     );
-
-    availableResults.forEach(candidate => {
+    
+    if (parsedBudget) {
+      filteredResults = filteredResults.filter(candidate => {
+        const expectedSalary = typeof candidate.expectedCtc === 'number' ? candidate.expectedCtc : null;
+        if (expectedSalary === null) {
+          return false;
+        }
+        
+        const salaryFit = candidate.salaryInsights ? candidate.salaryInsights.salaryFit : null;
+        
+        if (!salaryFit) {
+          return expectedSalary >= parsedBudget.min && expectedSalary <= parsedBudget.max;
+        }
+        
+        const { status } = salaryFit;
+        
+        if (status === 'perfect-match' || status === 'below-budget') {
+          return true;
+        }
+        
+        if (parsedBudget.includeNegotiable && (status === 'negotiable' || status === 'stretch')) {
+          return expectedSalary <= parsedBudget.max * 1.1;
+        }
+        
+        return expectedSalary >= parsedBudget.min && expectedSalary <= parsedBudget.max;
+      });
+    }
+    
+    filteredResults.sort((a, b) => b.matchScore - a.matchScore);
+    
+    filteredResults.forEach(candidate => {
       const existing = externalCandidates.find(c => c.id === candidate.id);
       if (!existing) {
         externalCandidates.push(candidate);
       }
     });
     
-    res.json({ success: true, data: availableResults });
+    const expectedValues = filteredResults
+      .map(candidate => candidate.expectedCtc)
+      .filter(value => typeof value === 'number');
+    
+    const averageExpectedCtc = expectedValues.length
+      ? Math.round(expectedValues.reduce((sum, value) => sum + value, 0) / expectedValues.length)
+      : null;
+    
+    const medianExpectedCtc = expectedValues.length
+      ? (() => {
+          const sorted = [...expectedValues].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          if (sorted.length % 2 === 0) {
+            return Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+          }
+          return sorted[mid];
+        })()
+      : null;
+    
+    const representativeExperience = Math.round((filters.experience.min + filters.experience.max) / 2);
+    const representativeLocation = filters.location || (filteredResults[0]?.location ?? 'Bangalore');
+    const representativeSkills = filters.skills.length
+      ? filters.skills
+      : (filteredResults[0]?.skills?.slice(0, 6) || []);
+    
+    const summaryPrediction = predictSalary({
+      experience: representativeExperience,
+      role: filters.jobTitle,
+      location: representativeLocation,
+      industry: filters.industry,
+      skills: representativeSkills,
+      companySize: filters.companySize
+    });
+    
+    const summaryComparisons = getMarketComparison({
+      experience: representativeExperience,
+      role: filters.jobTitle,
+      location: representativeLocation,
+      industry: filters.industry,
+      skills: representativeSkills,
+      companySize: filters.companySize
+    }).map(entry => ({
+      label: entry.companySize || entry.location,
+      type: entry.companySize ? 'companySize' : 'location',
+      salaryRange: entry.salaryRange,
+      multiplier: entry.multiplier
+    }));
+    
+    const salarySummary = {
+      budgetRange: parsedBudget,
+      predictedRange: summaryPrediction.salaryRange,
+      breakdown: summaryPrediction.breakdown,
+      averageExpectedCtc,
+      medianExpectedCtc,
+      candidateCount: filteredResults.length,
+      totalGenerated: results.length,
+      marketComparisons: summaryComparisons,
+      formatted: {
+        averageExpectedCtc: averageExpectedCtc ? formatSalary(averageExpectedCtc) : null,
+        medianExpectedCtc: medianExpectedCtc ? formatSalary(medianExpectedCtc) : null,
+        budgetMin: parsedBudget ? formatSalary(parsedBudget.min) : null,
+        budgetMax: parsedBudget ? formatSalary(parsedBudget.max) : null,
+        predictedMin: formatSalary(summaryPrediction.salaryRange.min),
+        predictedMax: formatSalary(summaryPrediction.salaryRange.max)
+      }
+    };
+    
+    res.json({ success: true, data: filteredResults, salarySummary });
   } catch (error) {
     console.error('Talent scout search error:', error);
     res.status(500).json({ 
@@ -2134,6 +2395,98 @@ app.post('/api/talent-scout/invite', authenticate, (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to send invitation' 
+    });
+  }
+});
+
+app.post('/api/salary/predict', authenticate, (req, res) => {
+  try {
+    const { experience, role, location, industry, skills, companySize } = req.body;
+
+    if (typeof experience !== 'number') {
+      return res.status(400).json({
+        success: false,
+        message: 'Experience (in years) is required'
+      });
+    }
+
+    const prediction = predictSalary({
+      experience,
+      role: role || 'Software Engineer',
+      location: location || 'Bangalore',
+      industry: industry || 'IT/Tech',
+      skills: skills || [],
+      companySize: companySize || 'SME'
+    });
+
+    res.json({
+      success: true,
+      data: prediction
+    });
+  } catch (error) {
+    console.error('Salary prediction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to predict salary'
+    });
+  }
+});
+
+app.post('/api/salary/market-comparison', authenticate, (req, res) => {
+  try {
+    const { experience, role, location, industry, skills, companySize } = req.body;
+
+    if (typeof experience !== 'number') {
+      return res.status(400).json({
+        success: false,
+        message: 'Experience (in years) is required'
+      });
+    }
+
+    const comparisons = getMarketComparison({
+      experience,
+      role: role || 'Software Engineer',
+      location,
+      industry: industry || 'IT/Tech',
+      skills: skills || [],
+      companySize: companySize || 'SME'
+    });
+
+    res.json({
+      success: true,
+      data: comparisons
+    });
+  } catch (error) {
+    console.error('Market comparison error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get market comparison'
+    });
+  }
+});
+
+app.post('/api/salary/check-fit', authenticate, (req, res) => {
+  try {
+    const { expectedSalary, budgetRange } = req.body;
+
+    if (typeof expectedSalary !== 'number' || !budgetRange) {
+      return res.status(400).json({
+        success: false,
+        message: 'Expected salary and budget range are required'
+      });
+    }
+
+    const fitAnalysis = checkSalaryFit(expectedSalary, budgetRange);
+
+    res.json({
+      success: true,
+      data: fitAnalysis
+    });
+  } catch (error) {
+    console.error('Salary fit check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check salary fit'
     });
   }
 });
