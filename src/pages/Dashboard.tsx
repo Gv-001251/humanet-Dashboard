@@ -6,76 +6,84 @@ import { api } from '../services/api';
 
 const COLORS = ['#1E40AF', '#059669', '#D97706', '#DC2626', '#0284C7'];
 
+type DashboardStats = {
+  totalEmployees: number;
+  activeProjects: number;
+  hiringThisMonth: number;
+  avgTimeToHire: number;
+};
+
+type FunnelStage = {
+  stage: string;
+  count: number;
+};
+
+type ProjectStatusSegment = {
+  name: string;
+  value: number;
+};
+
+type DepartmentDistribution = {
+  department: string;
+  count: number;
+};
+
+type SalaryExpensePoint = {
+  month: string;
+  amount: number;
+};
+
+type RecentActivityItem = {
+  id: string | number;
+  text: string;
+  time: string;
+  type: string;
+};
+
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+  message?: string;
+};
+
 export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalEmployees: 0,
-    activeProjects: 0,
-    hiringThisMonth: 0,
-    avgTimeToHire: 0
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
-  const [hiringFunnelData, setHiringFunnelData] = useState([
-    { stage: 'Applied', count: 150 },
-    { stage: 'Screened', count: 80 },
-    { stage: 'Interviewed', count: 45 },
-    { stage: 'Offered', count: 20 },
-    { stage: 'Hired', count: 15 }
-  ]);
+  const [hiringFunnelData, setHiringFunnelData] = useState<FunnelStage[]>([]);
 
-  const [projectStatusData, setProjectStatusData] = useState([
-    { name: 'Active', value: 12 },
-    { name: 'Completed', value: 8 },
-    { name: 'On Hold', value: 3 },
-    { name: 'Planning', value: 5 }
-  ]);
+  const [projectStatusData, setProjectStatusData] = useState<ProjectStatusSegment[]>([]);
 
-  const [employeeDistribution, setEmployeeDistribution] = useState([
-    { department: 'Engineering', count: 45 },
-    { department: 'HR', count: 8 },
-    { department: 'Sales', count: 12 },
-    { department: 'Marketing', count: 10 },
-    { department: 'Finance', count: 6 }
-  ]);
+  const [employeeDistribution, setEmployeeDistribution] = useState<DepartmentDistribution[]>([]);
 
-  const [salaryExpenses] = useState([
-    { month: 'Jan', amount: 350000 },
-    { month: 'Feb', amount: 360000 },
-    { month: 'Mar', amount: 375000 },
-    { month: 'Apr', amount: 390000 },
-    { month: 'May', amount: 410000 },
-    { month: 'Jun', amount: 425000 }
-  ]);
+  const [salaryExpenses, setSalaryExpenses] = useState<SalaryExpensePoint[]>([]);
 
-  const [recentActivities, setRecentActivities] = useState<Array<{ id: string | number; text: string; time: string; type: string }>>([
-    { id: 1, text: 'New candidate shortlisted: John Doe', time: '10 mins ago', type: 'candidate' },
-    { id: 2, text: 'Project "AI Dashboard" completed', time: '1 hour ago', type: 'project' },
-    { id: 3, text: 'Offer sent to Sarah Johnson', time: '2 hours ago', type: 'offer' },
-    { id: 4, text: 'New employee onboarded: Mike Chen', time: '5 hours ago', type: 'employee' },
-    { id: 5, text: 'Salary prediction saved for Data Analyst role', time: '1 day ago', type: 'salary' }
-  ]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivityItem[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const [overviewRes, funnelRes, projectsRes, employeesRes, activitiesRes] = await Promise.all([
-          api.get<{ success: boolean; data: typeof stats }>("/analytics/overview"),
-          api.get<{ success: boolean; data: { stage: string; count: number }[] }>("/analytics/hiring-funnel"),
-          api.get<{ success: boolean; data: { title: string; progress: number; teamSize: number; assignedEmployees: number }[] }>("/analytics/projects"),
-          api.get<{ success: boolean; data: Record<string, number> }>("/analytics/employees"),
-          api.get<{ success: boolean; data: { id: string | number; text: string; time: string; type: string }[] }>("/analytics/activities")
+        setError(null);
+        const [overviewRes, funnelRes, projectsRes, employeesRes, activitiesRes, salaryRes] = await Promise.all([
+          api.get<ApiResponse<DashboardStats>>("/analytics/overview"),
+          api.get<ApiResponse<FunnelStage[]>>("/analytics/hiring-funnel"),
+          api.get<ApiResponse<{ title: string; progress: number; teamSize: number; assignedEmployees: number }[]>>("/analytics/projects"),
+          api.get<ApiResponse<Record<string, number>>>("/analytics/employees"),
+          api.get<ApiResponse<RecentActivityItem[]>>("/analytics/activities"),
+          api.get<ApiResponse<SalaryExpensePoint[]>>("/analytics/salary-expenses")
         ]);
 
-        if (overviewRes.success) {
+        if (overviewRes.success && overviewRes.data) {
           setStats(overviewRes.data);
         }
 
-        if (funnelRes.success) {
+        if (funnelRes.success && funnelRes.data && funnelRes.data.length > 0) {
           setHiringFunnelData(funnelRes.data);
         }
 
-        if (projectsRes.success) {
+        if (projectsRes.success && projectsRes.data && projectsRes.data.length > 0) {
           const planningCount = projectsRes.data.filter(p => p.progress === 0).length;
           const activeCount = projectsRes.data.filter(p => p.progress > 0 && p.progress < 100).length;
           const completedCount = projectsRes.data.filter(p => p.progress >= 100).length;
@@ -90,7 +98,7 @@ export const Dashboard: React.FC = () => {
           setProjectStatusData(status);
         }
 
-        if (employeesRes.success) {
+        if (employeesRes.success && employeesRes.data) {
           const distribution = Object.entries(employeesRes.data).map(([department, count]) => ({
             department,
             count
@@ -100,7 +108,7 @@ export const Dashboard: React.FC = () => {
           }
         }
 
-        if (activitiesRes.success) {
+        if (activitiesRes.success && activitiesRes.data && activitiesRes.data.length > 0) {
           setRecentActivities(activitiesRes.data.map((activity, index) => ({
             id: activity.id ?? index,
             text: activity.text,
@@ -108,8 +116,13 @@ export const Dashboard: React.FC = () => {
             type: activity.type
           })));
         }
+
+        if (salaryRes.success && salaryRes.data && salaryRes.data.length > 0) {
+          setSalaryExpenses(salaryRes.data);
+        }
       } catch (error) {
         console.error('Error loading dashboard analytics', error);
+        setError('Failed to load dashboard data. Please try refreshing the page.');
       } finally {
         setLoading(false);
       }
@@ -245,9 +258,10 @@ export const Dashboard: React.FC = () => {
   };
 
   const totalProjects = projectStatusData.reduce((sum, project) => sum + project.value, 0);
-  const totalEmployees = stats.totalEmployees || 81;
-  const activeProjects = stats.activeProjects || 28;
-  const hiringThisMonth = stats.hiringThisMonth || 15;
+  const totalEmployees = stats?.totalEmployees ?? 0;
+  const activeProjectsCount = stats?.activeProjects ?? 0;
+  const hiringThisMonth = stats?.hiringThisMonth ?? 0;
+  const avgTimeToHireDays = stats?.avgTimeToHire ?? 0;
   const latestExpense = salaryExpenses[salaryExpenses.length - 1]?.amount ?? 0;
   const firstExpense = salaryExpenses[0]?.amount ?? 0;
   const expenseChange = firstExpense ? Math.round(((latestExpense - firstExpense) / firstExpense) * 100) : 0;
@@ -265,6 +279,12 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
         {/* Stats Cards */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -274,28 +294,28 @@ export const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <StatCard
               title="Total Employees"
-              value={stats.totalEmployees || 81}
+              value={totalEmployees}
               icon={<Users className="w-6 h-6 text-brand-primary" />}
               iconBg="bg-blue-50"
               trend={{ value: 12, isUp: true }}
             />
             <StatCard
               title="Active Projects"
-              value={stats.activeProjects || 28}
+              value={activeProjectsCount}
               icon={<Briefcase className="w-6 h-6 text-semantic-success" />}
               iconBg="bg-green-50"
               trend={{ value: 8, isUp: true }}
             />
             <StatCard
               title="Hiring This Month"
-              value={stats.hiringThisMonth || 15}
+              value={hiringThisMonth}
               icon={<TrendingUp className="w-6 h-6 text-semantic-warning" />}
               iconBg="bg-amber-50"
               trend={{ value: 5, isUp: false }}
             />
             <StatCard
               title="Avg Time-to-Hire"
-              value={`${stats.avgTimeToHire || 18} days`}
+              value={`${avgTimeToHireDays} days`}
               icon={<Clock className="w-6 h-6 text-semantic-info" />}
               iconBg="bg-cyan-50"
               trend={{ value: 3, isUp: false }}
@@ -327,8 +347,13 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-8 h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hiringFunnelData} barSize={28}>
+              {hiringFunnelData.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No hiring funnel data available yet.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={hiringFunnelData} barSize={28}>
                   <defs>
                     <linearGradient id="pipelineBar" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#1E40AF" stopOpacity={0.9} />
@@ -360,6 +385,7 @@ export const Dashboard: React.FC = () => {
                   <Bar dataKey="count" fill="url(#pipelineBar)" radius={[8, 8, 4, 4]} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background px-4 py-3">
@@ -415,56 +441,68 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="text-right">
                 <p className="text-xs font-semibold uppercase text-neutral-muted">Active projects</p>
-                <p className="mt-1 text-2xl font-semibold text-neutral-text">{activeProjects}</p>
+                <p className="mt-1 text-2xl font-semibold text-neutral-text">{activeProjectsCount}</p>
               </div>
             </div>
             <div className="mt-6 h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={projectStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {projectStatusData.map((segment, index) => (
-                      <Cell key={segment.name} fill={COLORS[index % COLORS.length]} stroke="#F8FAFC" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
-                      fontFamily: 'Inter',
-                      fontSize: '13px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {projectStatusData.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No project status data available.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={projectStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {projectStatusData.map((segment, index) => (
+                        <Cell key={segment.name} fill={COLORS[index % COLORS.length]} stroke="#F8FAFC" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: '1px solid #E2E8F0',
+                        boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
+                        fontFamily: 'Inter',
+                        fontSize: '13px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {projectStatusData.map((segment, index) => {
-                const percentage = totalProjects ? Math.round((segment.value / totalProjects) * 100) : 0;
-                return (
-                  <div
-                    key={segment.name}
-                    className="flex items-center justify-between rounded-lg border border-neutral-border/70 bg-neutral-background px-3 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <p className="text-sm font-medium text-neutral-text">{segment.name}</p>
+              {projectStatusData.length === 0 ? (
+                <div className="col-span-full flex h-24 items-center justify-center rounded-lg border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No project distribution available yet.
+                </div>
+              ) : (
+                projectStatusData.map((segment, index) => {
+                  const percentage = totalProjects ? Math.round((segment.value / totalProjects) * 100) : 0;
+                  return (
+                    <div
+                      key={segment.name}
+                      className="flex items-center justify-between rounded-lg border border-neutral-border/70 bg-neutral-background px-3 py-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <p className="text-sm font-medium text-neutral-text">{segment.name}</p>
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-subtler">{percentage}%</p>
                     </div>
-                    <p className="text-sm font-semibold text-neutral-subtler">{percentage}%</p>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -483,42 +521,48 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-6 h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={employeeDistribution} layout="vertical" barSize={18}>
-                  <defs>
-                    <linearGradient id="departmentBar" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="5%" stopColor="#0F172A" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#1E40AF" stopOpacity={0.7} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid horizontal={false} stroke="#E2E8F0" strokeDasharray="2 8" />
-                  <XAxis
-                    type="number"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="department"
-                    width={140}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
-                      fontFamily: 'Inter',
-                      fontSize: '13px',
-                    }}
-                    cursor={{ fill: 'rgba(15, 23, 42, 0.06)' }}
-                  />
-                  <Bar dataKey="count" fill="url(#departmentBar)" radius={[4, 12, 12, 4]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {employeeDistribution.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No employee distribution data available.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={employeeDistribution} layout="vertical" barSize={18}>
+                    <defs>
+                      <linearGradient id="departmentBar" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="5%" stopColor="#0F172A" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#1E40AF" stopOpacity={0.7} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid horizontal={false} stroke="#E2E8F0" strokeDasharray="2 8" />
+                    <XAxis
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="department"
+                      width={140}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: '1px solid #E2E8F0',
+                        boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
+                        fontFamily: 'Inter',
+                        fontSize: '13px',
+                      }}
+                      cursor={{ fill: 'rgba(15, 23, 42, 0.06)' }}
+                    />
+                    <Bar dataKey="count" fill="url(#departmentBar)" radius={[4, 12, 12, 4]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -544,47 +588,53 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-6 h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salaryExpenses}>
-                  <defs>
-                    <linearGradient id="expenseArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#1E40AF" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#1E40AF" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="2 8" stroke="#E2E8F0" vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
-                  />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value as number)}
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
-                      fontFamily: 'Inter',
-                      fontSize: '13px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="amount"
-                    stroke="#1E40AF"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2, fill: '#1E40AF' }}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    fill="url(#expenseArea)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {salaryExpenses.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No salary expense data available.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salaryExpenses}>
+                    <defs>
+                      <linearGradient id="expenseArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#1E40AF" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#1E40AF" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="2 8" stroke="#E2E8F0" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#475569', fontSize: 12, fontFamily: 'Inter' }}
+                    />
+                    <Tooltip
+                      formatter={(value) => formatCurrency(value as number)}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: '1px solid #E2E8F0',
+                        boxShadow: '0px 16px 32px rgba(15, 23, 42, 0.08)',
+                        fontFamily: 'Inter',
+                        fontSize: '13px',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="amount"
+                      stroke="#1E40AF"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2, fill: '#1E40AF' }}
+                      activeDot={{ r: 6, strokeWidth: 2 }}
+                      fill="url(#expenseArea)"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -608,32 +658,38 @@ export const Dashboard: React.FC = () => {
               </button>
             </div>
             <div className="mt-6 space-y-6">
-              {recentActivities.map((activity, index) => {
-                const isLast = index === recentActivities.length - 1;
-                return (
-                  <div key={activity.id} className="relative pl-8">
-                    {!isLast && <span className="absolute left-[7px] top-7 h-full w-px bg-neutral-border/80" />}
-                    <span
-                      className={`absolute left-0 top-1.5 flex h-3 w-3 items-center justify-center rounded-full ${
-                        activityToneMap[activity.type] ?? 'bg-brand-accent'
-                      }`}
-                    />
-                    <div className="flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span
-                          className={`text-xs font-semibold uppercase tracking-wide ${
-                            activityTextToneMap[activity.type] ?? 'text-neutral-text'
-                          }`}
-                        >
-                          {activityLabelMap[activity.type] ?? 'Update'}
-                        </span>
-                        <span className="text-xs text-neutral-muted">{activity.time}</span>
+              {recentActivities.length === 0 ? (
+                <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-neutral-border/70 bg-neutral-background text-sm text-neutral-muted">
+                  No recent activity available.
+                </div>
+              ) : (
+                recentActivities.map((activity, index) => {
+                  const isLast = index === recentActivities.length - 1;
+                  return (
+                    <div key={activity.id} className="relative pl-8">
+                      {!isLast && <span className="absolute left-[7px] top-7 h-full w-px bg-neutral-border/80" />}
+                      <span
+                        className={`absolute left-0 top-1.5 flex h-3 w-3 items-center justify-center rounded-full ${
+                          activityToneMap[activity.type] ?? 'bg-brand-accent'
+                        }`}
+                      />
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            className={`text-xs font-semibold uppercase tracking-wide ${
+                              activityTextToneMap[activity.type] ?? 'text-neutral-text'
+                            }`}
+                          >
+                            {activityLabelMap[activity.type] ?? 'Update'}
+                          </span>
+                          <span className="text-xs text-neutral-muted">{activity.time}</span>
+                        </div>
+                        <p className="text-sm font-medium text-neutral-text leading-relaxed">{activity.text}</p>
                       </div>
-                      <p className="text-sm font-medium text-neutral-text leading-relaxed">{activity.text}</p>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
