@@ -3,10 +3,17 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
+const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
 const { connectDB, getDB } = require('./src/config/mongodb');
+
+// Configure allowed MIME types
+const ALLOWED_MIME_TYPES = {
+  'application/pdf': true,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+  'text/csv': true
+};
 
 const uploadsDir = path.join(__dirname, 'uploads');
 
@@ -1175,9 +1182,14 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
       let csvCandidatesCreated = 0;
 
       if (file.mimetype === 'application/pdf') {
-        const buffer = fs.readFileSync(file.path);
-        const data = await pdfParse(buffer);
-        extractedText = data.text;
+        try {
+          const buffer = fs.readFileSync(file.path);
+          const data = await pdf(buffer);
+          extractedText = data.text;
+        } catch (error) {
+          console.error('Error parsing PDF:', error);
+          continue;
+        }
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         const result = await mammoth.extractRawText({ path: file.path });
         extractedText = result.value;
