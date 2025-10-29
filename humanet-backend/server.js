@@ -11,7 +11,8 @@ const {
   predictSalary,
   getMarketComparison,
   checkSalaryFit,
-  formatSalary
+  formatSalary,
+  getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
 
 // Configure allowed MIME types
@@ -2205,6 +2206,8 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
     };
     
     let parsedBudget = null;
+    let derivedExperienceRange = null;
+    
     if (salaryBudget && typeof salaryBudget === 'object') {
       const minBudget = normalizeBudgetValue(salaryBudget.min);
       const maxBudget = normalizeBudgetValue(salaryBudget.max);
@@ -2215,15 +2218,22 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
           max: Math.max(minBudget, maxBudget),
           includeNegotiable: salaryBudget.includeNegotiable !== false
         };
+        
+        derivedExperienceRange = getExperienceFromSalary(parsedBudget);
       }
     }
     
-    const experienceRange = experience && typeof experience === 'object'
+    const experienceRange = derivedExperienceRange 
       ? {
-          min: typeof experience.min === 'number' ? experience.min : 0,
-          max: typeof experience.max === 'number' ? experience.max : 15
+          min: derivedExperienceRange.min,
+          max: derivedExperienceRange.max
         }
-      : { min: 0, max: 15 };
+      : (experience && typeof experience === 'object'
+          ? {
+              min: typeof experience.min === 'number' ? experience.min : 0,
+              max: typeof experience.max === 'number' ? experience.max : 15
+            }
+          : { min: 0, max: 15 });
     
     const filters = {
       platform: platform || 'both',
@@ -2234,7 +2244,8 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
       salaryBudget: parsedBudget,
       jobTitle: jobTitle || keywords.trim(),
       industry: industry || 'IT/Tech',
-      companySize: companySize || 'SME'
+      companySize: companySize || 'SME',
+      experienceFromSalary: derivedExperienceRange
     };
     
     let results = [];
@@ -2276,6 +2287,26 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
         }
         
         return expectedSalary >= parsedBudget.min && expectedSalary <= parsedBudget.max;
+      });
+    }
+
+    if (derivedExperienceRange && Array.isArray(derivedExperienceRange.probabilities)) {
+      filteredResults = filteredResults.map(candidate => {
+        const probabilityMatch = derivedExperienceRange.probabilities.find(entry => {
+          const minYears = entry.experience.min;
+          const maxYears = entry.experience.max;
+          return candidate.experience >= minYears && candidate.experience <= maxYears;
+        });
+
+        if (probabilityMatch) {
+          candidate.experienceProbability = probabilityMatch.probability;
+          candidate.experienceRangeMatch = probabilityMatch.experience;
+        } else {
+          candidate.experienceProbability = null;
+          candidate.experienceRangeMatch = null;
+        }
+
+        return candidate;
       });
     }
     
@@ -2345,6 +2376,7 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
       candidateCount: filteredResults.length,
       totalGenerated: results.length,
       marketComparisons: summaryComparisons,
+      experienceMapping: derivedExperienceRange,
       formatted: {
         averageExpectedCtc: averageExpectedCtc ? formatSalary(averageExpectedCtc) : null,
         medianExpectedCtc: medianExpectedCtc ? formatSalary(medianExpectedCtc) : null,
