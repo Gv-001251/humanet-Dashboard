@@ -6,6 +6,7 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
+const { connectDB, getDB } = require('./src/config/mongodb');
 
 const uploadsDir = path.join(__dirname, 'uploads');
 
@@ -94,6 +95,73 @@ let candidates = [
     createdAt: new Date('2024-01-17')
   }
 ];
+
+let candidateCollection = null;
+
+const normalizeCandidate = (candidate) => {
+  if (!candidate) {
+    return null;
+  }
+
+  const normalized = { ...candidate };
+  normalized.createdAt = candidate?.createdAt ? new Date(candidate.createdAt) : new Date();
+  return normalized;
+};
+
+const mapCandidateDocument = (doc) => {
+  if (!doc) {
+    return null;
+  }
+
+  const { _id, ...rest } = doc;
+  return normalizeCandidate(rest);
+};
+
+const refreshCandidatesFromDB = async () => {
+  if (!candidateCollection) {
+    return candidates;
+  }
+
+  try {
+    const docs = await candidateCollection.find({}, { projection: { _id: 0 } }).toArray();
+    candidates = docs.map(mapCandidateDocument).filter(Boolean);
+  } catch (error) {
+    console.error('Failed to refresh candidates from MongoDB:', error);
+  }
+
+  return candidates;
+};
+
+const initializeDatabase = async () => {
+  try {
+    const db = await connectDB();
+    if (!db) {
+      return;
+    }
+
+    candidateCollection = db.collection('candidates');
+    await candidateCollection.createIndex({ id: 1 }, { unique: true });
+
+    const existingCandidates = await candidateCollection.find({}, { projection: { _id: 0 } }).toArray();
+
+    if (existingCandidates.length > 0) {
+      candidates = existingCandidates.map(mapCandidateDocument).filter(Boolean);
+    } else if (candidates.length > 0) {
+      const documents = candidates.map(candidate => normalizeCandidate(candidate)).filter(Boolean);
+      if (documents.length > 0) {
+        await candidateCollection.insertMany(documents, { ordered: false });
+        candidates = documents.map(candidate => ({ ...candidate }));
+      }
+    }
+
+    console.log(`Candidate collection initialized with ${candidates.length} records.`);
+  } catch (error) {
+    console.error('Failed to initialize candidates collection:', error);
+    candidateCollection = null;
+  }
+};
+
+initializeDatabase();
 
 let employees = [
   {
@@ -1204,8 +1272,18 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
               createdAt: new Date()
             };
 
-            candidates.push(candidate);
-            parsedCandidates.push(candidate);
+            const normalizedCandidate = normalizeCandidate(candidate);
+
+            if (candidateCollection && normalizedCandidate) {
+              try {
+                await candidateCollection.insertOne({ ...normalizedCandidate });
+              } catch (error) {
+                console.error('Failed to save candidate to MongoDB:', error);
+              }
+            }
+
+            candidates.push(normalizedCandidate);
+            parsedCandidates.push(normalizedCandidate);
             csvCandidatesCreated++;
           }
         }
@@ -1233,9 +1311,23 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
           createdAt: new Date()
         };
 
-        candidates.push(candidate);
-        parsedCandidates.push(candidate);
+        const normalizedCandidate = normalizeCandidate(candidate);
+
+        if (candidateCollection && normalizedCandidate) {
+          try {
+            await candidateCollection.insertOne({ ...normalizedCandidate });
+          } catch (error) {
+            console.error('Failed to save candidate to MongoDB:', error);
+          }
+        }
+
+        candidates.push(normalizedCandidate);
+        parsedCandidates.push(normalizedCandidate);
       }
+    }
+
+    if (candidateCollection && parsedCandidates.length > 0) {
+      await refreshCandidatesFromDB();
     }
 
     res.json({ success: true, data: parsedCandidates });
@@ -1245,51 +1337,138 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
   }
 });
 
-app.get('/api/candidates', authenticate, (req, res) => {
-  res.json({ success: true, data: candidates });
+app.get('/api/candidates', authenticate, async (req, res) => {
+  try {
+    await refreshCandidatesFromDB();
+    res.json({ success: true, data: candidates });
+  } catch (error) {
+    console.error('Failed to get candidates:', error);
+    res.json({ success: true, data: candidates });
+  }
 });
 
-app.get('/api/candidates/:id', authenticate, (req, res) => {
-  const candidate = candidates.find(c => c.id === req.params.id);
-  if (!candidate) {
-    return res.status(404).json({ success: false, message: 'Candidate not found' });
+app.get('/api/candidates/:id', authenticate, async (req, res) => {
+  const candidateId = req.params.id;
+
+  try {
+    let candidate = candidates.find(c => c.id === candidateId);
+
+    if (candidateCollection) {
+      const document = await candidateCollection.findOne({ id: candidateId }, { projection: { _id: 0 } });
+      if (document) {
+        candidate = mapCandidateDocument(document);
+        const existingIndex = candidates.findIndex(c => c.id === candidateId);
+        if (existingIndex !== -1) {
+          candidates[existingIndex] = candidate;
+        } else if (candidate) {
+          candidates.push(candidate);
+        }
+      }
+    }
+
+    if (!candidate) {
+      return res.status(404).json({ success: false, message: 'Candidate not found' });
+    }
+
+    res.json({ success: true, data: candidate });
+  } catch (error) {
+    console.error('Failed to get candidate:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch candidate' });
   }
-  res.json({ success: true, data: candidate });
 });
 
-app.put('/api/candidates/:id/status', authenticate, (req, res) => {
-  const candidate = candidates.find(c => c.id === req.params.id);
-  if (!candidate) {
-    return res.status(404).json({ success: false, message: 'Candidate not found' });
+app.put('/api/candidates/:id/status', authenticate, async (req, res) => {
+  const candidateId = req.params.id;
+
+  try {
+    const { status } = req.body;
+    let candidate = candidates.find(c => c.id === candidateId);
+
+    if (!candidate && candidateCollection) {
+      const existing = await candidateCollection.findOne({ id: candidateId }, { projection: { _id: 0 } });
+      if (existing) {
+        candidate = mapCandidateDocument(existing);
+        candidates.push(candidate);
+      }
+    }
+
+    if (!candidate) {
+      return res.status(404).json({ success: false, message: 'Candidate not found' });
+    }
+
+    candidate.status = status;
+
+    if (candidateCollection) {
+      try {
+        await candidateCollection.updateOne(
+          { id: candidateId },
+          { $set: { status } }
+        );
+        await refreshCandidatesFromDB();
+        const refreshedCandidate = candidates.find(c => c.id === candidateId);
+        if (refreshedCandidate) {
+          candidate = refreshedCandidate;
+        }
+      } catch (error) {
+        console.error('Failed to update candidate status in MongoDB:', error);
+      }
+    }
+
+    if (status === 'shortlisted') {
+      notifications.unshift({
+        id: `notif-${Date.now()}`,
+        message: `Candidate ${candidate.name} shortlisted`,
+        type: 'candidate',
+        read: false,
+        timestamp: new Date()
+      });
+    }
+
+    res.json({ success: true, data: candidate });
+  } catch (error) {
+    console.error('Failed to update candidate status:', error);
+    res.status(500).json({ success: false, message: 'Failed to update candidate status' });
   }
-
-  const { status } = req.body;
-  candidate.status = status;
-
-  if (status === 'shortlisted') {
-    notifications.unshift({
-      id: `notif-${Date.now()}`,
-      message: `Candidate ${candidate.name} shortlisted`,
-      type: 'candidate',
-      read: false,
-      timestamp: new Date()
-    });
-  }
-
-  res.json({ success: true, data: candidate });
 });
 
-app.delete('/api/candidates/:id', authenticate, (req, res) => {
-  const index = candidates.findIndex(c => c.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: 'Candidate not found' });
+app.delete('/api/candidates/:id', authenticate, async (req, res) => {
+  const candidateId = req.params.id;
+
+  try {
+    let candidateIndex = candidates.findIndex(c => c.id === candidateId);
+    let candidate = candidateIndex !== -1 ? candidates[candidateIndex] : null;
+
+    if (candidateCollection) {
+      try {
+        const deletion = await candidateCollection.findOneAndDelete({ id: candidateId }, { projection: { _id: 0 } });
+        if (deletion.value) {
+          candidate = mapCandidateDocument(deletion.value);
+        } else if (!candidate) {
+          return res.status(404).json({ success: false, message: 'Candidate not found' });
+        }
+      } catch (error) {
+        console.error('Failed to delete candidate from MongoDB:', error);
+        return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+      }
+    } else if (!candidate) {
+      return res.status(404).json({ success: false, message: 'Candidate not found' });
+    }
+
+    if (candidateIndex !== -1) {
+      candidates.splice(candidateIndex, 1);
+    }
+
+    deleteResumeFile(candidate?.resumeUrl);
+
+    if (candidateCollection) {
+      await refreshCandidatesFromDB();
+    }
+
+    res.json({ success: true, message: 'Candidate removed' });
+  } catch (error) {
+    console.error('Failed to delete candidate:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete candidate' });
   }
-  
-  const candidate = candidates[index];
-  deleteResumeFile(candidate?.resumeUrl);
-  
-  candidates.splice(index, 1);
-  res.json({ success: true, message: 'Candidate removed' });
 });
 
 app.post('/api/projects', authenticate, (req, res) => {
