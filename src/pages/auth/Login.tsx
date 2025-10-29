@@ -4,6 +4,7 @@ import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoginCredentials } from '../../types/auth.types';
+import { PasswordStrengthMeter } from '../../components/common/PasswordStrengthMeter';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -115,6 +116,8 @@ export const Login: React.FC = () => {
                 </svg>
               }
             />
+
+            <PasswordStrengthMeter password={credentials.password} />
 
             <div className="flex items-center justify-between">
               <label className="flex items-center">

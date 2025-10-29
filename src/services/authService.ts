@@ -7,6 +7,7 @@ export const authService = {
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(credentials)
     });
 
@@ -19,23 +20,18 @@ export const authService = {
   },
 
   logout: async (): Promise<void> => {
-    const token = localStorage.getItem('humanet_token');
-    
-    if (token) {
-      try {
-        await fetch(`${API_BASE}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
+    try {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
     }
 
-    localStorage.removeItem('humanet_token');
     localStorage.removeItem('humanet_user');
   }
 };

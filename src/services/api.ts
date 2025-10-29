@@ -1,21 +1,56 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('humanet_token');
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    Accept: 'application/json'
   };
 };
 
+async function refreshAccessToken(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return false;
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      ...getAuthHeaders(),
-      ...options.headers
-    },
-    ...options
-  });
+  const makeRequest = async (): Promise<Response> => {
+    return fetch(`${API_BASE}${endpoint}`, {
+      credentials: 'include',
+      headers: {
+        ...getAuthHeaders(),
+        ...options.headers
+      },
+      ...options
+    });
+  };
+
+  let response = await makeRequest();
+
+  if (response.status === 401) {
+    try {
+      const errorData = await response.clone().json();
+      if (errorData.code === 'TOKEN_EXPIRED') {
+        const refreshSuccess = await refreshAccessToken();
+        if (refreshSuccess) {
+          response = await makeRequest();
+        }
+      }
+    } catch (e) {
+      console.error('Error handling 401:', e);
+    }
+  }
 
   if (!response.ok) {
     let errorMessage = 'Something went wrong';
@@ -23,6 +58,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorMessage;
+      
+      if (errorData.code === 'TOKEN_EXPIRED' || errorData.code === 'TOKEN_REVOKED' || errorData.code === 'NO_TOKEN') {
+        localStorage.removeItem('humanet_user');
+        window.location.href = '/login';
+      }
     } catch (error) {
       console.error('Unable to parse error response', error);
     }

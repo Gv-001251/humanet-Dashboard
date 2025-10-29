@@ -3,7 +3,6 @@ import { LoginCredentials, LoginResponse, User } from '../types/auth.types';
 
 interface AuthContextValue {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
@@ -12,36 +11,58 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_TOKEN_KEY = 'humanet_token';
 const STORAGE_USER_KEY = 'humanet_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(STORAGE_TOKEN_KEY);
-    const storedUser = localStorage.getItem(STORAGE_USER_KEY);
+    const initializeAuth = async () => {
+      setIsLoading(true);
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      try {
-        const parsedUser = JSON.parse(storedUser) as User;
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Failed to parse stored user', error);
-        localStorage.removeItem(STORAGE_USER_KEY);
-        localStorage.removeItem(STORAGE_TOKEN_KEY);
+      const storedUser = localStorage.getItem(STORAGE_USER_KEY);
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser) as User;
+          setUser(parsedUser);
+        } catch (error) {
+          console.error('Failed to parse stored user', error);
+          localStorage.removeItem(STORAGE_USER_KEY);
+        }
       }
-    }
-    setIsLoading(false);
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/me`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.user) {
+            setUser(data.user);
+            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
+          }
+        } else if (response.status === 401) {
+          setUser(null);
+          localStorage.removeItem(STORAGE_USER_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to fetch current user', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(credentials)
     });
 
@@ -52,16 +73,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const data = await response.json() as LoginResponse;
 
-    setToken(data.token);
     setUser(data.user);
-    localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
     localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
   };
 
-  const logout = () => {
-    setToken(null);
+  const logout = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
     setUser(null);
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
     localStorage.removeItem(STORAGE_USER_KEY);
   };
 
@@ -74,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const value = useMemo(() => ({ user, token, isLoading, login, logout, updateUser }), [user, token, isLoading]);
+  const value = useMemo(() => ({ user, isLoading, login, logout, updateUser }), [user, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
