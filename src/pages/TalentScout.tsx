@@ -4,8 +4,8 @@ import {
   Search,
   Filter,
   MapPin,
+  Clock,
   Briefcase,
-  Star,
   Award,
   Send,
   ExternalLink,
@@ -164,6 +164,17 @@ export const TalentScout: React.FC = () => {
     );
   };
 
+  const getAvailabilityTextClass = (availability: ExternalCandidate['availability']) => {
+    const classes = {
+      Immediate: 'text-green-600',
+      '15 Days': 'text-blue-600',
+      '1 Month': 'text-amber-600',
+      'Not Specified': 'text-gray-600'
+    } as const;
+
+    return classes[availability] || 'text-gray-600';
+  };
+
   const renderCandidateCard = (candidate: ExternalCandidate) => (
     <div key={candidate.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all p-6">
       <div className="flex items-start justify-between mb-4">
@@ -203,6 +214,12 @@ export const TalentScout: React.FC = () => {
         <div className="flex items-center">
           <Briefcase className="w-4 h-4 mr-2 text-gray-400" />
           <span>{candidate.experience} years experience</span>
+        </div>
+        <div className="flex items-center">
+          <Clock className="w-4 h-4 mr-2 text-gray-400" />
+          <span className={`font-medium ${getAvailabilityTextClass(candidate.availability)}`}>
+            Available: {candidate.availability}
+          </span>
         </div>
         <div className="flex items-center">
           <Award className="w-4 h-4 mr-2 text-gray-400" />

@@ -741,6 +741,9 @@ app.put('/api/settings/ats', authenticate, (req, res) => {
 
 let externalCandidates = [];
 
+const AVAILABLE_AVAILABILITY_VALUES = ['Immediate', '15 Days', '1 Month'];
+const AVAILABLE_AVAILABILITY_STATUSES = new Set(AVAILABLE_AVAILABILITY_VALUES);
+
 const calculateMatchScore = (candidate, searchFilters) => {
   let score = 0;
   const candidateSkills = candidate.skills.map(s => s.toLowerCase());
@@ -814,7 +817,7 @@ const generateMockLinkedInCandidates = (filters, count = 5) => {
       bio: `Experienced ${roles[Math.floor(Math.random() * roles.length)]} with ${experience} years in software development. Passionate about building scalable applications.`,
       source: 'linkedin',
       atsScore: Math.floor(Math.random() * 30) + 70,
-      availability: ['Immediate', '15 Days', '1 Month', 'Not Specified'][Math.floor(Math.random() * 4)],
+      availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
       expectedCtc: Math.floor(Math.random() * 2000000) + 1000000,
       status: 'discovered'
     };
@@ -870,7 +873,7 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
       bio: `Results-driven professional with ${experience} years of expertise in software development and team leadership.`,
       source: 'naukri',
       atsScore: Math.floor(Math.random() * 30) + 70,
-      availability: ['Immediate', '15 Days', '1 Month', 'Not Specified'][Math.floor(Math.random() * 4)],
+      availability: AVAILABLE_AVAILABILITY_VALUES[Math.floor(Math.random() * AVAILABLE_AVAILABILITY_VALUES.length)],
       expectedCtc: Math.floor(Math.random() * 2000000) + 800000,
       status: 'discovered'
     };
@@ -915,14 +918,18 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
     
     results.sort((a, b) => b.matchScore - a.matchScore);
     
-    results.forEach(candidate => {
+    const availableResults = results.filter(candidate => 
+      AVAILABLE_AVAILABILITY_STATUSES.has(candidate.availability)
+    );
+
+    availableResults.forEach(candidate => {
       const existing = externalCandidates.find(c => c.id === candidate.id);
       if (!existing) {
         externalCandidates.push(candidate);
       }
     });
     
-    res.json({ success: true, data: results });
+    res.json({ success: true, data: availableResults });
   } catch (error) {
     console.error('Talent scout search error:', error);
     res.status(500).json({ 
@@ -933,7 +940,10 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
 });
 
 app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
-  const invitedCandidates = externalCandidates.filter(c => c.status === 'invited' || c.status === 'applied');
+  const invitedCandidates = externalCandidates.filter(c => 
+    (c.status === 'invited' || c.status === 'applied') && 
+    AVAILABLE_AVAILABILITY_STATUSES.has(c.availability)
+  );
   res.json({ success: true, data: invitedCandidates });
 });
 
