@@ -9,11 +9,14 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #eef2ff 0%, #f8fbff 50%, #f1f5ff 100%);
-  color: #0f172a;
+  background-color: #F8FAFC;
+  color: #0F172A;
+}
+
+::selection {
+  color: #FFFFFF;
+  background-color: rgba(30, 64, 175, 0.85);
 }

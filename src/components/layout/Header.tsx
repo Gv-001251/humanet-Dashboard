@@ -9,31 +9,44 @@ export const Header: React.FC = () => {
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
+  const initials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'HN';
+
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 py-4 px-6 flex items-center justify-between shadow-sm">
-      <div>
-        <h1 className="text-2xl font-semibold bg-gradient-to-r from-slate-900 via-indigo-900 to-blue-900 bg-clip-text text-transparent">HumaNet Platform</h1>
-        <p className="text-sm text-slate-600">Human capital intelligence for modern teams.</p>
-      </div>
-      <div className="flex items-center space-x-4">
-        <button
-          onClick={() => navigate('/messages')}
-          className="relative p-2 rounded-full hover:bg-indigo-50 transition-all group"
-        >
-          <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-indigo-600' : 'text-slate-600'} group-hover:scale-110 transition-transform`} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow-lg animate-pulse">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center space-x-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-            {user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'HN'}
-          </div>
-          <div>
-            <div className="text-sm font-medium text-slate-900">{user?.name || 'HumaNet User'}</div>
-            <div className="text-xs text-slate-600 capitalize">{user?.role || 'Role'}</div>
+    <header className="sticky top-0 z-40 border-b border-neutral-border bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
+      <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-6 px-6 py-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold uppercase tracking-[0.32em] text-neutral-muted">HUMANET</span>
+          <h1 className="text-xl font-semibold text-neutral-text">HR Intelligence Platform</h1>
+          <p className="text-sm text-neutral-subtler">Confident decisions for people leaders at enterprise scale.</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/messages')}
+            className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-border bg-white text-neutral-text transition-all duration-200 ease-gentle hover:-translate-y-0.5 hover:border-brand-primary/40 hover:shadow-subtle"
+            aria-label="View notifications"
+          >
+            <Bell className={`h-5 w-5 ${unreadCount > 0 ? 'text-brand-primary' : 'text-neutral-subtler'}`} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-semantic-error text-[11px] font-semibold text-white shadow-subtle">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <div className="flex items-center gap-3 rounded-xl border border-neutral-border bg-white px-4 py-2.5 shadow-subtle">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary/10 text-sm font-semibold text-brand-primary">
+              {initials}
+            </div>
+            <div className="leading-tight">
+              <p className="text-sm font-semibold text-neutral-text">{user?.name || 'HumaNet User'}</p>
+              <p className="text-xs text-neutral-muted">{user?.role ? user.role : 'HR Leader'}</p>
+            </div>
           </div>
         </div>
       </div>
