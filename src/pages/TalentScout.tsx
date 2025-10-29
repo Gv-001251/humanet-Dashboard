@@ -19,8 +19,7 @@ import {
   Mail,
   Phone,
   TrendingUp,
-  Info,
-  Upload
+  Info
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { talentScoutService } from '../services/talentScoutService';
@@ -28,7 +27,7 @@ import { ExternalCandidate, SearchFilters } from '../types/talentScout.types';
 
 export const TalentScout: React.FC = () => {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    platform: 'internal',
+    platform: 'both',
     keywords: '',
     location: '',
     experience: { min: 0, max: 15 },
@@ -44,9 +43,7 @@ export const TalentScout: React.FC = () => {
   const [isInviting, setIsInviting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'search' | 'saved' | 'upload'>('search');
-  const [uploadingResumes, setUploadingResumes] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
 
   useEffect(() => {
     loadSavedCandidates();
@@ -86,30 +83,6 @@ export const TalentScout: React.FC = () => {
       alert('Failed to search candidates. Please try again.');
     } finally {
       setIsSearching(false);
-    }
-  };
-
-  const handleUploadResumes = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFiles || selectedFiles.length === 0) {
-      alert('Please select resume files to upload');
-      return;
-    }
-
-    setUploadingResumes(true);
-    try {
-      const response = await talentScoutService.uploadResumes(selectedFiles);
-      if (response.success) {
-        alert(`Successfully uploaded ${response.data.length} resume(s)`);
-        setSelectedFiles(null);
-        const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-      }
-    } catch (error) {
-      console.error('Error uploading resumes:', error);
-      alert('Failed to upload resumes. Please try again.');
-    } finally {
-      setUploadingResumes(false);
     }
   };
 
@@ -436,19 +409,6 @@ export const TalentScout: React.FC = () => {
               </span>
             </div>
           </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`px-6 py-3 font-semibold rounded-lg transition-all duration-200 ${
-              activeTab === 'upload'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <Upload className="w-4 h-4" />
-              <span>Upload Resumes</span>
-            </div>
-          </button>
         </div>
 
         {activeTab === 'search' && (
@@ -663,75 +623,6 @@ export const TalentScout: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'upload' && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Upload className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Upload Employee Resumes</h2>
-                <p className="text-gray-600 text-sm">Add employee profiles to the internal talent pool</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleUploadResumes} className="space-y-6">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 transition-colors">
-                <input
-                  id="resume-upload"
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx"
-                  onChange={(e) => setSelectedFiles(e.target.files)}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="resume-upload"
-                  className="cursor-pointer flex flex-col items-center"
-                >
-                  <Upload className="w-16 h-16 text-gray-400 mb-4" />
-                  <p className="text-lg font-semibold text-gray-700 mb-2">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    PDF or DOCX files (Multiple files supported)
-                  </p>
-                  {selectedFiles && selectedFiles.length > 0 && (
-                    <div className="mt-4 text-sm text-indigo-600 font-medium">
-                      {selectedFiles.length} file(s) selected
-                    </div>
-                  )}
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={uploadingResumes}
-                disabled={!selectedFiles || selectedFiles.length === 0}
-                className="w-full py-3 text-base bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
-              >
-                <Upload className="w-5 h-5 mr-2" />
-                {uploadingResumes ? 'Uploading...' : 'Upload Resumes'}
-              </Button>
-            </form>
-
-            <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-700">
-                  <p className="font-semibold mb-1">How it works:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Upload employee resumes in PDF or DOCX format</li>
-                    <li>The system will automatically extract skills, experience, and contact details</li>
-                    <li>Profiles will be added to the searchable talent pool</li>
-                    <li>Use the Search tab to find matching candidates for your requirements</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Detail Modal for Naukri Candidates */}
         {showDetailModal && selectedCandidate && (

@@ -88,7 +88,7 @@ export interface ExternalCandidate {
   location: string;
   education: string;
   bio?: string;
-  source: 'linkedin' | 'naukri';
+  source: 'linkedin' | 'naukri' | 'internal';
   atsScore: number;
   matchScore: number;
   availability: 'Immediate' | '15 Days' | '1 Month' | 'Not Specified';
