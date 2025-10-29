@@ -16,6 +16,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Automatic resume parsing using pdf-parse and mammoth
 - Extract: name, email, phone, skills, experience, education, CTC
 - Advanced candidate filtering system
+- Automatic email notifications to shortlisted and rejected candidates (configurable)
 - Match score algorithm
 - Bulk operations (shortlist, reject, export)
 
@@ -91,6 +92,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - **Database:** MongoDB Atlas
 - **File Processing:** pdf-parse, mammoth
 - **File Upload:** multer
+- **Email Service:** nodemailer (Gmail, Outlook, SMTP support)
 
 ### Frontend
 - **Framework:** React 18
@@ -252,6 +254,8 @@ DB_NAME=humanet_hr
 PORT=3001
 NODE_ENV=development
 ```
+
+To enable automatic email notifications for shortlisted candidates, copy the email configuration variables from `.env.example` and follow the [Email Setup Guide](humanet-backend/EMAIL_SETUP_GUIDE.md).
 
 Remember to replace `<db_password>` with your actual MongoDB Atlas password. For additional connection details and troubleshooting tips, refer to `MONGODB_ATLAS_SETUP.md`.
 
