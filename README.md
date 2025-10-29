@@ -20,21 +20,27 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Match score algorithm
 - Bulk operations (shortlist, reject, export)
 
-### 3. **Talent Scout - External Candidate Search**
-- Search LinkedIn & Naukri.com for external candidates
-- Multi-platform search (both platforms or individually)
-- Advanced filters: keywords, location, experience range, skills
-- AI-powered candidate scoring (ATS + Match scores)
-- Intelligent match score algorithm:
+### 3. **Talent Scout - External Candidate Search with LinkedIn Integration**
+- **LinkedIn Integration**: Search LinkedIn profiles using HR-provided keywords
+- **Keyword-Based Search**: Job titles, skills, and role-based candidate discovery
+- **Multi-Platform Support**: Search LinkedIn & Naukri.com individually or together
+- **Intelligent Filtering**: Keywords, location, experience range, required skills
+- **Platform Selection**: Choose specific platforms (LinkedIn only, Naukri only, or both)
+- **Integration Status Visibility**: Shows whether running in demo mode or connected to live LinkedIn API
+- **AI-Powered Scoring**: ATS + Match scores for candidate ranking
+- **Match Score Algorithm**:
   - Skills overlap (60% weight)
   - Experience fit (30% weight)
   - Location match (10% weight)
-- Personalized candidate invitations
-- Track invitation status (discovered → invited → applied)
-- Save and manage external candidates
-- Real-time notifications on invitations
-- LinkedIn profiles: Direct external link viewing
-- Naukri profiles: Detailed modal view (external links not available due to platform restrictions)
+  - Keyword relevance scoring
+- **Personalized Invitations**: Send custom messages to candidates
+- **Status Tracking**: Monitor candidates through discovered → invited → applied stages
+- **Candidate Management**: Save and organize external candidates
+- **Real-Time Notifications**: Get alerts on invitation responses
+- **Profile Viewing**: 
+  - LinkedIn profiles: Direct external link viewing
+  - Naukri profiles: Detailed modal view within the platform
+- **Configuration**: Easy setup with environment variables for LinkedIn API credentials (see `humanet-backend/LINKEDIN_INTEGRATION.md` for details)
 
 ### 4. **AutoMatch - AI-Powered Job Matching**
 - Create job postings with requirements

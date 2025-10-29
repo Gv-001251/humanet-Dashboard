@@ -149,11 +149,25 @@ export interface SalarySummary {
   };
 }
 
+export interface LinkedInIntegrationStatus {
+  enabled: boolean;
+  configured: boolean;
+  apiKeySet: boolean;
+  clientIdSet: boolean;
+  mode: 'production' | 'mock';
+}
+
 export interface SearchResponse {
   success: boolean;
   data: ExternalCandidate[];
   salarySummary?: SalarySummary;
   message?: string;
+  meta?: {
+    searchKeywords: string;
+    platform: SearchFilters['platform'];
+    totalResults: number;
+    linkedinIntegration?: LinkedInIntegrationStatus;
+  };
 }
 
 export interface InviteRequest {

@@ -16,6 +16,10 @@ const {
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
 const { sendShortlistEmail, sendRejectionEmail } = require('./src/services/emailService');
+const { 
+  searchLinkedInProfiles, 
+  getConfigurationStatus
+} = require('./src/services/linkedinIntegrationService');
 
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
@@ -2190,19 +2194,20 @@ const calculateMatchScore = (candidate, searchFilters) => {
 
 // Mock data generation functions removed - using real employee profiles instead
 
-app.post('/api/talent-scout/search', (req, res) => {
+app.post('/api/talent-scout/search', async (req, res) => {
   try {
     const {
       keywords,
       location,
       experience,
-      skills = []
+      skills = [],
+      platform = 'both'
     } = req.body;
     
     if (!keywords || !keywords.trim()) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Keywords are required' 
+        message: 'Keywords are required for searching' 
       });
     }
     
@@ -2213,14 +2218,42 @@ app.post('/api/talent-scout/search', (req, res) => {
         }
       : { min: 0, max: 15 };
     
+    const normalizedPlatform = typeof platform === 'string' ? platform.toLowerCase() : 'both';
+    const allowedPlatforms = ['linkedin', 'naukri', 'both'];
+    const selectedPlatform = allowedPlatforms.includes(normalizedPlatform) ? normalizedPlatform : 'both';
+    
     const filters = {
       keywords: keywords.trim(),
       location: location || '',
       experience: experienceRange,
-      skills: Array.isArray(skills) ? skills : []
+      skills: Array.isArray(skills) ? skills : [],
+      platform: selectedPlatform
     };
     
-    let filteredResults = talentScoutProfiles.filter(profile => {
+    console.log(`[Talent Scout] Searching with HR-provided keywords: "${filters.keywords}"`);
+    console.log(`[Talent Scout] Platform filter: ${filters.platform}`);
+    
+    let filteredResults = [];
+    
+    // Search LinkedIn profiles when platform includes LinkedIn
+    if (selectedPlatform === 'linkedin' || selectedPlatform === 'both') {
+      console.log('[Talent Scout] Fetching profiles from LinkedIn...');
+      const linkedInResults = await searchLinkedInProfiles(filters);
+      filteredResults = [...filteredResults, ...linkedInResults];
+    }
+    
+    const allowedSources = selectedPlatform === 'linkedin'
+      ? ['linkedin']
+      : selectedPlatform === 'naukri'
+        ? ['naukri', 'internal']
+        : ['linkedin', 'naukri', 'internal'];
+
+    console.log(`[Talent Scout] Searching existing profiles from sources: ${allowedSources.join(', ')}`);
+    const existingResults = talentScoutProfiles.filter(profile => {
+      if (!allowedSources.includes(profile.source)) {
+        return false;
+      }
+      
       const keywordLower = filters.keywords.toLowerCase();
       const keywordMatch = 
         profile.name.toLowerCase().includes(keywordLower) ||
@@ -2252,15 +2285,40 @@ app.post('/api/talent-scout/search', (req, res) => {
       return true;
     });
     
+    filteredResults = [...filteredResults, ...existingResults];
+    
+    // Calculate match scores for all results
     filteredResults = filteredResults.map(profile => {
       const profileWithScore = { ...profile };
       profileWithScore.matchScore = calculateMatchScore(profileWithScore, filters);
       return profileWithScore;
     });
     
-    filteredResults.sort((a, b) => b.matchScore - a.matchScore);
+    // Remove duplicates based on email (in case there are overlaps)
+    const uniqueResults = [];
+    const seenEmails = new Set();
+    filteredResults.forEach(profile => {
+      if (!seenEmails.has(profile.email)) {
+        seenEmails.add(profile.email);
+        uniqueResults.push(profile);
+      }
+    });
     
-    res.json({ success: true, data: filteredResults });
+    // Sort by match score
+    uniqueResults.sort((a, b) => b.matchScore - a.matchScore);
+    
+    console.log(`[Talent Scout] Found ${uniqueResults.length} candidates matching HR keywords`);
+    
+    res.json({ 
+      success: true, 
+      data: uniqueResults,
+      meta: {
+        searchKeywords: filters.keywords,
+        platform: filters.platform,
+        totalResults: uniqueResults.length,
+        linkedinIntegration: getConfigurationStatus()
+      }
+    });
   } catch (error) {
     console.error('Talent scout search error:', error);
     res.status(500).json({ 
@@ -2273,6 +2331,17 @@ app.post('/api/talent-scout/search', (req, res) => {
 app.get('/api/talent-scout/candidates', (req, res) => {
   const invitedProfiles = talentScoutProfiles.filter(p => p.status === 'invited');
   res.json({ success: true, data: invitedProfiles });
+});
+
+app.get('/api/talent-scout/linkedin-status', (req, res) => {
+  const status = getConfigurationStatus();
+  res.json({ 
+    success: true, 
+    data: status,
+    message: status.configured 
+      ? 'LinkedIn integration is configured and active'
+      : 'LinkedIn integration running in mock mode. Configure LINKEDIN_API_KEY in .env for production use.'
+  });
 });
 
 app.post('/api/talent-scout/invite', (req, res) => {
