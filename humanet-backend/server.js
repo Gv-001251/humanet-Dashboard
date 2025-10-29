@@ -1,5 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const xssClean = require('xss-clean');
+const hpp = require('hpp');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +21,17 @@ const {
   formatSalary,
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
+const {
+  initializeUserStore,
+  getAllUsers,
+  findUserById,
+  addUser,
+  updateUser,
+  sanitizeUser
+} = require('./src/data/userStore');
+const authRoutes = require('./src/routes/authRoutes');
+const { authenticate } = require('./src/middleware/authMiddleware');
+const { cleanupExpiredTokens } = require('./src/utils/jwtUtils');
 
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
@@ -33,10 +51,51 @@ const ensureUploadsDirExists = () => {
 ensureUploadsDirExists();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(mongoSanitize());
+app.use(xssClean());
+app.use(hpp());
+app.use(compression());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', limiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use((req, res, next) => {
+  req.db = getDB();
+  next();
+});
+
 app.use('/uploads', express.static(uploadsDir));
 
 const storage = multer.diskStorage({
@@ -50,14 +109,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-let users = [
-  { id: 'user1', email: 'hr@humanet.com', password: 'hr123', name: 'Gayathri G', role: 'hr' },
-  { id: 'user2', email: 'admin@humanet.com', password: 'admin123', name: 'Alex Doe', role: 'admin' },
-  { id: 'user3', email: 'lead@humanet.com', password: 'lead123', name: 'Priya Singh', role: 'team_lead' },
-  { id: 'user4', email: 'ceo@humanet.com', password: 'ceo123', name: 'Vikram Rao', role: 'ceo' },
-  { id: 'user5', email: 'investor@humanet.com', password: 'investor123', name: 'Nisha Patel', role: 'investor' }
-];
 
 let candidates = [
   {
@@ -146,6 +197,9 @@ const refreshCandidatesFromDB = async () => {
 const initializeDatabase = async () => {
   try {
     const db = await connectDB();
+
+    await initializeUserStore(db);
+
     if (!db) {
       return;
     }
@@ -167,8 +221,9 @@ const initializeDatabase = async () => {
 
     console.log(`Candidate collection initialized with ${candidates.length} records.`);
   } catch (error) {
-    console.error('Failed to initialize candidates collection:', error);
+    console.error('Failed to initialize database:', error);
     candidateCollection = null;
+    await initializeUserStore(null);
   }
 };
 
@@ -1136,45 +1191,16 @@ const deleteResumeFile = resumeUrl => {
   }
 };
 
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ success: false, message: 'Missing authorization header' });
+app.use('/api/auth', authLimiter, authRoutes);
+
+setInterval(() => {
+  try {
+    const db = getDB();
+    cleanupExpiredTokens(db);
+  } catch (error) {
+    console.error('Token cleanup error:', error);
   }
-
-  const token = authHeader.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-
-  const user = users.find(u => token.includes(u.id));
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-
-  req.user = { id: user.id, role: user.role, name: user.name, email: user.email };
-  next();
-};
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
-
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid credentials' });
-  }
-
-  const { password: _password, ...userWithoutPassword } = user;
-  res.json({
-    success: true,
-    token: `token-${user.id}-${Date.now()}`,
-    user: userWithoutPassword
-  });
-});
-
-app.post('/api/auth/logout', authenticate, (req, res) => {
-  res.json({ success: true, message: 'Logged out successfully' });
-});
+}, 60 * 60 * 1000);
 
 app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), async (req, res) => {
   try {
@@ -1803,69 +1829,94 @@ app.put('/api/messages/:id/read', authenticate, (req, res) => {
 });
 
 app.get('/api/settings/profile', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
+  const user = findUserById(req.user.id);
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found' });
   }
-  const { password, ...userWithoutPassword } = user;
-  res.json({ success: true, data: userWithoutPassword });
+  const safeUser = sanitizeUser(user);
+  res.json({ success: true, data: safeUser });
 });
 
-app.put('/api/settings/profile', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.put('/api/settings/profile', authenticate, async (req, res) => {
+  try {
+    const updates = {};
+    if (req.body.name) updates.name = req.body.name;
+    
+    const user = await updateUser(req.user.id, updates);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const safeUser = sanitizeUser(user);
+    res.json({ success: true, data: safeUser });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Error updating profile' });
   }
-  user.name = req.body.name || user.name;
-  res.json({ success: true, data: { id: user.id, name: user.name, email: user.email, role: user.role } });
-});
-
-app.put('/api/settings/password', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
-  }
-  user.password = req.body.password;
-  res.json({ success: true, message: 'Password updated successfully' });
 });
 
 app.get('/api/settings/users', authenticate, (req, res) => {
-  res.json({
-    success: true,
-    data: users.map(({ password, ...user }) => user)
-  });
+  const allUsers = getAllUsers();
+  res.json({ success: true, data: allUsers });
 });
 
-app.post('/api/settings/users', authenticate, (req, res) => {
-  const newUser = {
-    id: `user-${Date.now()}`,
-    name: req.body.name,
-    email: req.body.email,
-    role: req.body.role,
-    password: req.body.password || 'password123'
-  };
-  users.push(newUser);
-  const { password, ...userWithoutPassword } = newUser;
-  res.json({ success: true, data: userWithoutPassword });
-});
+app.post('/api/settings/users', authenticate, async (req, res) => {
+  try {
+    const { name, email, role, password } = req.body;
+    
+    if (!email || !name || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and password are required'
+      });
+    }
 
-app.put('/api/settings/users/:id', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.params.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+    const user = await addUser({
+      name,
+      email,
+      role: role || 'employee',
+      password
+    });
+
+    const safeUser = sanitizeUser(user);
+    res.json({ success: true, data: safeUser });
+  } catch (error) {
+    console.error('Add user error:', error);
+    res.status(500).json({ success: false, message: 'Error adding user' });
   }
-  Object.assign(user, req.body);
-  const { password, ...userWithoutPassword } = user;
-  res.json({ success: true, data: userWithoutPassword });
 });
 
-app.delete('/api/settings/users/:id', authenticate, (req, res) => {
-  const index = users.findIndex(u => u.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.put('/api/settings/users/:id', authenticate, async (req, res) => {
+  try {
+    const updates = {};
+    if (req.body.name) updates.name = req.body.name;
+    if (req.body.role) updates.role = req.body.role;
+    if (req.body.status) updates.status = req.body.status;
+    
+    const user = await updateUser(req.params.id, updates);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const safeUser = sanitizeUser(user);
+    res.json({ success: true, data: safeUser });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ success: false, message: 'Error updating user' });
   }
-  users.splice(index, 1);
-  res.json({ success: true, message: 'User removed' });
+});
+
+app.delete('/api/settings/users/:id', authenticate, async (req, res) => {
+  try {
+    const user = await updateUser(req.params.id, { status: 'inactive' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, message: 'User deactivated successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ success: false, message: 'Error deactivating user' });
+  }
 });
 
 app.get('/api/settings/company', authenticate, (req, res) => {

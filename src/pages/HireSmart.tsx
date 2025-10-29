@@ -34,9 +34,7 @@ export const HireSmart: React.FC = () => {
   const fetchCandidates = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
-        }
+        credentials: 'include'
       });
 
       if (!response.ok) throw new Error('Failed to fetch candidates');
@@ -77,9 +75,7 @@ export const HireSmart: React.FC = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/upload`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
-        },
+        credentials: 'include',
         body: formData
       });
 
@@ -139,9 +135,9 @@ export const HireSmart: React.FC = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}/status`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus })
       });
 
@@ -165,9 +161,7 @@ export const HireSmart: React.FC = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('humanet_token')}`
-        }
+        credentials: 'include'
       });
 
       if (!response.ok) throw new Error('Failed to delete candidate');
