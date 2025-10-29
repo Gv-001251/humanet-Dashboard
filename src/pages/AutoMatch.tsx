@@ -34,6 +34,9 @@ interface Project {
   category: string;
   status: 'draft' | 'matching' | 'matched' | 'assigned';
   assignedEmployees: EmployeeMatch[];
+  suggestedEmployees: EmployeeMatch[];
+  selectedEmployeeIds: string[];
+  recommendedTeamSize: number;
 }
 
 interface EmployeeMatch {
@@ -188,6 +191,74 @@ const ALL_EMPLOYEES: EmployeeMatch[] = [
     ],
     recentProjects: ['Design System', 'Marketing Website', 'Admin Dashboard'],
     certifications: ['Google UX Design', 'React Professional']
+  },
+  {
+    id: 'emp-5',
+    name: 'Meera Patel',
+    role: 'DevOps Engineer',
+    skills: ['AWS', 'Kubernetes', 'CI/CD', 'Terraform', 'Docker'],
+    matchScore: 83,
+    availability: 'Available',
+    experience: '5 years',
+    matchReasons: [
+      { icon: '🎯', label: 'Cloud expertise', detail: 'Deep AWS & Kubernetes experience', score: 85 },
+      { icon: '⚙️', label: 'Delivery speed', detail: 'CI/CD specialist boosts velocity', score: 80 },
+      { icon: '⭐', label: 'Experience level', detail: '5 years in enterprise DevOps', score: 88 },
+      { icon: '✅', label: 'Availability', detail: 'Ready to onboard immediately', score: 100 }
+    ],
+    recentProjects: ['CI/CD Modernization', 'Container Platform Rollout', 'Observability Upgrade'],
+    certifications: ['CKA', 'Terraform Associate']
+  },
+  {
+    id: 'emp-6',
+    name: 'Kavya Krishnan',
+    role: 'Mobile Developer',
+    skills: ['React Native', 'TypeScript', 'Swift', 'Kotlin', 'UI/UX'],
+    matchScore: 81,
+    availability: 'Available',
+    experience: '4 years',
+    matchReasons: [
+      { icon: '📱', label: 'Mobile-first expertise', detail: 'Native iOS and Android delivery', score: 88 },
+      { icon: '🎯', label: 'Skill overlap', detail: 'Strong React Native & TypeScript', score: 84 },
+      { icon: '🧩', label: 'Cross-platform', detail: 'Bridges design & engineering', score: 80 },
+      { icon: '✅', label: 'Availability', detail: 'Immediate availability', score: 100 }
+    ],
+    recentProjects: ['Fintech Super App', 'Fitness Companion', 'Retail Loyalty Platform'],
+    certifications: ['React Native Advanced', 'Swift Professional']
+  },
+  {
+    id: 'emp-7',
+    name: 'Rohan Agarwal',
+    role: 'Site Reliability Engineer',
+    skills: ['Monitoring', 'Incident Management', 'Automation', 'Node.js', 'Python'],
+    matchScore: 79,
+    availability: 'Available',
+    experience: '5 years',
+    matchReasons: [
+      { icon: '🛡️', label: 'Reliability focus', detail: 'Incident response specialist', score: 82 },
+      { icon: '⚙️', label: 'Automation depth', detail: 'Builds resilient pipelines', score: 80 },
+      { icon: '📊', label: 'Observability', detail: 'Designs proactive monitoring', score: 76 },
+      { icon: '✅', label: 'Availability', detail: 'Can start this sprint', score: 100 }
+    ],
+    recentProjects: ['Uptime Automation', 'Incident Command Program', 'Service Reliability Toolkit'],
+    certifications: ['Google SRE', 'Prometheus Professional']
+  },
+  {
+    id: 'emp-8',
+    name: 'Divya Menon',
+    role: 'Product Manager',
+    skills: ['Product Strategy', 'Agile Delivery', 'Analytics', 'Stakeholder Management'],
+    matchScore: 77,
+    availability: 'Partially Available',
+    experience: '6 years',
+    matchReasons: [
+      { icon: '🧭', label: 'Strategic alignment', detail: 'Connects delivery to outcomes', score: 78 },
+      { icon: '🤝', label: 'Stakeholder partner', detail: 'Strong collaboration record', score: 80 },
+      { icon: '📈', label: 'Data-led decisions', detail: 'Analytics driven prioritization', score: 75 },
+      { icon: '⚠️', label: 'Availability', detail: 'Rolling off current project in 1 week', score: 68 }
+    ],
+    recentProjects: ['AI Analytics Suite', 'Customer Portal Revamp', 'Subscription Growth Program'],
+    certifications: ['CSPO', 'Pragmatic Institute PMC']
   }
 ];
 
@@ -216,18 +287,23 @@ export const AutoMatch: React.FC = () => {
       priority: template.priority,
       category: template.category,
       status: 'matching',
-      assignedEmployees: []
+      assignedEmployees: [],
+      suggestedEmployees: [],
+      selectedEmployeeIds: [],
+      recommendedTeamSize: template.teamSize
     };
 
     setTimeout(() => {
-      const matchedEmployees = ALL_EMPLOYEES
-        .slice(0, template.teamSize)
-        .sort((a, b) => b.matchScore - a.matchScore);
+      const sortedEmployees = [...ALL_EMPLOYEES].sort((a, b) => b.matchScore - a.matchScore);
+      const suggestedCount = Math.min(template.teamSize + 4, ALL_EMPLOYEES.length);
+      const suggestedEmployees = sortedEmployees.slice(0, suggestedCount);
+      const initialSelectedIds = suggestedEmployees.slice(0, template.teamSize).map(e => e.id);
 
       const completedProject = {
         ...project,
         status: 'matched' as const,
-        assignedEmployees: matchedEmployees
+        suggestedEmployees,
+        selectedEmployeeIds: initialSelectedIds
       };
 
       setProjects(prev => prev.map(p => p.id === project.id ? completedProject : p));
@@ -251,18 +327,23 @@ export const AutoMatch: React.FC = () => {
       priority: customProject.priority,
       category: 'Custom',
       status: 'matching',
-      assignedEmployees: []
+      assignedEmployees: [],
+      suggestedEmployees: [],
+      selectedEmployeeIds: [],
+      recommendedTeamSize: customProject.teamSize
     };
 
     setTimeout(() => {
-      const matchedEmployees = ALL_EMPLOYEES
-        .slice(0, customProject.teamSize)
-        .sort((a, b) => b.matchScore - a.matchScore);
+      const sortedEmployees = [...ALL_EMPLOYEES].sort((a, b) => b.matchScore - a.matchScore);
+      const suggestedCount = Math.min(customProject.teamSize + 4, ALL_EMPLOYEES.length);
+      const suggestedEmployees = sortedEmployees.slice(0, suggestedCount);
+      const initialSelectedIds = suggestedEmployees.slice(0, customProject.teamSize).map(e => e.id);
 
       const completedProject = {
         ...project,
         status: 'matched' as const,
-        assignedEmployees: matchedEmployees
+        suggestedEmployees,
+        selectedEmployeeIds: initialSelectedIds
       };
 
       setProjects(prev => prev.map(p => p.id === project.id ? completedProject : p));
@@ -273,9 +354,35 @@ export const AutoMatch: React.FC = () => {
     setCustomProject({ title: '', description: '', requiredSkills: '', teamSize: 3, timeline: '8 weeks', priority: 'medium' });
   };
 
+  const toggleEmployeeSelection = (projectId: string, employeeId: string) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== projectId) return p;
+      const isSelected = p.selectedEmployeeIds.includes(employeeId);
+      return {
+        ...p,
+        selectedEmployeeIds: isSelected
+          ? p.selectedEmployeeIds.filter(id => id !== employeeId)
+          : [...p.selectedEmployeeIds, employeeId]
+      };
+    }));
+  };
+
   const handleAssignTeam = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    if (project.selectedEmployeeIds.length === 0) {
+      alert('Please select at least one team member before assigning.');
+      return;
+    }
+
+    const assignedEmployees = project.suggestedEmployees.filter(e =>
+      project.selectedEmployeeIds.includes(e.id)
+    );
+
     setProjects(prev => prev.map(p => 
-      p.id === projectId ? { ...p, status: 'assigned' as const } : p
+      p.id === projectId 
+        ? { ...p, status: 'assigned' as const, assignedEmployees } 
+        : p
     ));
   };
 
@@ -642,7 +749,16 @@ export const AutoMatch: React.FC = () => {
               </div>
             </div>
           ) : (
-            projects.map(project => (
+            projects.map(project => {
+              const selectedEmployees = project.suggestedEmployees.filter(employee =>
+                project.selectedEmployeeIds.includes(employee.id)
+              );
+              const selectedCount = selectedEmployees.length;
+              const assignedCount = project.status === 'assigned' ? project.assignedEmployees.length : selectedCount;
+              const suggestionsCount = project.suggestedEmployees.length;
+              const showOverSelection = selectedCount > project.recommendedTeamSize;
+
+              return (
               <div key={project.id} className="bg-white rounded-2xl shadow-subtle border border-neutral-border overflow-hidden">
                 {/* Project Header */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 border-b border-neutral-border">
@@ -707,7 +823,7 @@ export const AutoMatch: React.FC = () => {
                 )}
 
                 {/* Matched Team */}
-                {(project.status === 'matched' || project.status === 'assigned') && project.assignedEmployees.length > 0 && (
+                {(project.status === 'matched' || project.status === 'assigned') && project.suggestedEmployees.length > 0 && (
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
@@ -717,7 +833,7 @@ export const AutoMatch: React.FC = () => {
                         <div>
                           <h4 className="text-lg font-semibold text-neutral-text">Perfect Team Found!</h4>
                           <p className="text-sm text-neutral-subtler">
-                            {project.assignedEmployees.length} highly matched team members ready to start
+                            {project.selectedEmployeeIds.length} selected / {project.recommendedTeamSize} recommended · {project.suggestedEmployees.length} suggestions available
                           </p>
                         </div>
                       </div>
@@ -727,16 +843,28 @@ export const AutoMatch: React.FC = () => {
                           onClick={() => handleAssignTeam(project.id)}
                           variant="primary"
                           className="flex items-center gap-2"
+                          disabled={selectedCount === 0}
                         >
                           <CheckCircle2 className="w-4 h-4" />
-                          Assign Team
+                          Assign Team ({selectedCount})
                         </Button>
                       )}
                     </div>
 
+                    {showOverSelection && (
+                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        You have selected {selectedCount} members, which is more than the recommended team size of {project.recommendedTeamSize}. That's okay—just ensure everyone has a clear role before assigning.
+                      </div>
+                    )}
+
                     <div className="space-y-4">
-                      {project.assignedEmployees.map((employee, index) => (
-                        <div key={employee.id} className="border-2 border-neutral-border hover:border-brand-primary rounded-xl p-5 transition-all bg-white">
+                      {project.suggestedEmployees.map((employee, index) => {
+                        const isSelected = project.selectedEmployeeIds.includes(employee.id);
+                        const isRecommended = index < project.recommendedTeamSize;
+                        return (
+                        <div key={employee.id} className={`border-2 rounded-xl p-5 transition-all bg-white ${
+                          isSelected ? 'border-brand-primary shadow-subtle ring-1 ring-brand-primary/20' : 'border-neutral-border hover:border-brand-primary/60'
+                        }`}>
                           {/* Employee Header */}
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-start gap-4">
@@ -744,12 +872,27 @@ export const AutoMatch: React.FC = () => {
                                 {employee.name.charAt(0)}
                               </div>
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                   <h5 className="text-lg font-bold text-neutral-text">{employee.name}</h5>
                                   {index === 0 && (
-                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold flex items-center gap-1">
+                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold inline-flex items-center gap-1">
                                       <Award className="w-3 h-3" />
                                       Top Match
+                                    </span>
+                                  )}
+                                  {isRecommended && (
+                                    <span className="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded">
+                                      Recommended
+                                    </span>
+                                  )}
+                                  {!isRecommended && (
+                                    <span className="px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-600 rounded">
+                                      Additional
+                                    </span>
+                                  )}
+                                  {project.status === 'assigned' && isSelected && (
+                                    <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-700 rounded">
+                                      Assigned
                                     </span>
                                   )}
                                 </div>
@@ -758,10 +901,28 @@ export const AutoMatch: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Match Score */}
-                            <div className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 ${getMatchScoreColor(employee.matchScore)}`}>
-                              <span className="text-2xl font-bold">{employee.matchScore}</span>
-                              <span className="text-xs font-medium">Match</span>
+                            {/* Match Score & Selection Button */}
+                            <div className="flex flex-col items-end gap-2">
+                              <div className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 ${getMatchScoreColor(employee.matchScore)}`}>
+                                <span className="text-2xl font-bold">{employee.matchScore}</span>
+                                <span className="text-xs font-medium">Match</span>
+                              </div>
+                              {project.status === 'matched' && (
+                                <button
+                                  onClick={() => toggleEmployeeSelection(project.id, employee.id)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
+                                    isSelected
+                                      ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
+                                      : 'bg-white text-neutral-text border-neutral-border hover:border-brand-primary hover:text-brand-primary'
+                                  }`}
+                                >
+                                  {isSelected ? (
+                                    <><CheckCircle2 className="w-3.5 h-3.5" /> Selected</>
+                                  ) : (
+                                    <><PlusCircle className="w-3.5 h-3.5" /> Add</>
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -852,7 +1013,7 @@ export const AutoMatch: React.FC = () => {
                           <div>
                             <p className="font-semibold text-green-900">Team Successfully Assigned!</p>
                             <p className="text-sm text-green-700">
-                              All team members have been notified and the project is ready to begin.
+                              {project.assignedEmployees.length} team members have been notified and the project is ready to begin.
                             </p>
                           </div>
                         </div>
@@ -861,7 +1022,7 @@ export const AutoMatch: React.FC = () => {
                   </div>
                 )}
               </div>
-            ))
+            });
           )}
         </div>
 

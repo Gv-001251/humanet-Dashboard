@@ -44,6 +44,8 @@ export const TalentScout: React.FC = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
+  const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     loadSavedCandidates();
@@ -67,17 +69,40 @@ export const TalentScout: React.FC = () => {
       return;
     }
 
+    const filtersSnapshot: SearchFilters = {
+      ...searchFilters,
+      skills: [...searchFilters.skills]
+    };
+
     setIsSearching(true);
     try {
-      const response = await talentScoutService.search(searchFilters);
+      const response = await talentScoutService.search({ ...filtersSnapshot, resultsPerPlatform: 20 });
       if (response.success) {
         setCandidates(response.data);
+        setLastSearchFilters(filtersSnapshot);
       }
     } catch (error) {
       console.error('Error searching candidates:', error);
       alert('Failed to search candidates. Please try again.');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!lastSearchFilters) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await talentScoutService.search({ ...lastSearchFilters, resultsPerPlatform: 10 });
+      if (response.success) {
+        setCandidates(prev => [...prev, ...response.data]);
+      }
+    } catch (error) {
+      console.error('Error loading more candidates:', error);
+      alert('Failed to load more candidates. Please try again.');
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -114,6 +139,12 @@ export const TalentScout: React.FC = () => {
       `Hi ${candidate.name},\n\nWe came across your profile and are impressed with your experience in ${candidate.skills.slice(0, 3).join(', ')}. We have an exciting opportunity that matches your expertise.\n\nWould you be interested in exploring this further?\n\nBest regards,\nHumaNet HR Team`
     );
     setShowInviteModal(true);
+  };
+
+  const mergeCandidates = (current: ExternalCandidate[], incoming: ExternalCandidate[]) => {
+    const existingIds = new Set(current.map(c => c.id));
+    const uniqueIncoming = incoming.filter(c => !existingIds.has(c.id));
+    return [...current, ...uniqueIncoming];
   };
 
   const handleSendInvite = async () => {
@@ -590,6 +621,16 @@ export const TalentScout: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {candidates.map(candidate => renderCandidateCard(candidate))}
+                </div>
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={handleLoadMore}
+                    variant="outline"
+                    isLoading={isLoadingMore}
+                    className="px-8"
+                  >
+                    Load more candidates
+                  </Button>
                 </div>
               </div>
             )}

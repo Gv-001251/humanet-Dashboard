@@ -13,7 +13,7 @@ interface CandidateListResponse {
 }
 
 export const talentScoutService = {
-  search: (filters: SearchFilters) =>
+  search: (filters: SearchFilters & { resultsPerPlatform?: number }) =>
     api.post<SearchResponse>('/talent-scout/search', filters),
 
   getSavedCandidates: () =>
