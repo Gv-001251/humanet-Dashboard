@@ -38,11 +38,11 @@ Role: Employee
 ## MongoDB Atlas Credentials
 
 ```
-URI: mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+URI: mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 Database: humanet_hr
 ```
 
-**Note**: The application is configured to use the MongoDB Atlas connection provided above. If the connection fails, the application will automatically fall back to in-memory storage for development purposes. See `MONGODB_ATLAS_SETUP.md` for detailed information about the MongoDB connection.
+**Note**: Replace `<db_password>` with your actual MongoDB Atlas password. The application is configured to use the MongoDB Atlas connection provided above. If the connection fails, the application will automatically fall back to in-memory storage for development purposes. See `MONGODB_ATLAS_SETUP.md` for detailed information about the MongoDB connection.
 
 ## Sample Data
 

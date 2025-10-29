@@ -1,6 +1,6 @@
 const { MongoClient } = require('mongodb');
 
-const DEFAULT_ATLAS_URI = 'mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin';
+const DEFAULT_ATLAS_URI = 'mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/';
 
 let db = null;
 let client = null;

@@ -104,13 +104,13 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 ## 📋 MongoDB Configuration
 
 ```
-URI: mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+URI: mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 Database: humanet_hr
 Backend Port: 3001
 Frontend Port: 5173
 ```
 
-**Note**: The application is configured with MongoDB Atlas. If the connection fails, it will automatically fall back to in-memory storage. See `MONGODB_ATLAS_SETUP.md` for detailed information.
+**Note**: Replace `<db_password>` with your actual MongoDB Atlas password. The application is configured with MongoDB Atlas. If the connection fails, it will automatically fall back to in-memory storage. See `MONGODB_ATLAS_SETUP.md` for detailed information.
 
 ## 🗂️ MongoDB Collections
 
@@ -247,13 +247,13 @@ npm install
 
 Create `.env` file in `humanet-backend/` directory:
 ```env
-MONGODB_URI=mongodb://atlas-sql-68efb1431fe8371b9a3f376f-kjuaj8.a.query.mongodb.net/humanet_hr?ssl=true&authSource=admin
+MONGODB_URI=mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
 DB_NAME=humanet_hr
 PORT=3001
 NODE_ENV=development
 ```
 
-For additional connection details and troubleshooting tips, refer to `MONGODB_ATLAS_SETUP.md`.
+Remember to replace `<db_password>` with your actual MongoDB Atlas password. For additional connection details and troubleshooting tips, refer to `MONGODB_ATLAS_SETUP.md`.
 
 ### Running the Application
 
