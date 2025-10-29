@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
-import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2, Search } from 'lucide-react';
 import { Button } from '../components/common/Button';
 
 interface Candidate {
@@ -18,10 +18,15 @@ interface Candidate {
   education: string;
 }
 
+const MIN_ATS_THRESHOLD = 60;
+const MAX_ATS_THRESHOLD = 90;
+const DEFAULT_ATS_THRESHOLD = 70;
+
 export const HireSmart: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [atsThreshold, setAtsThreshold] = useState(70);
+  const [atsThreshold, setAtsThreshold] = useState(DEFAULT_ATS_THRESHOLD);
+  const [skillSearch, setSkillSearch] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -221,11 +226,22 @@ export const HireSmart: React.FC = () => {
     }
   };
 
-  const filteredCandidates = candidates.filter(c => {
-    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
-    if (c.atsScore < atsThreshold) return false;
-    return true;
-  });
+  const handleResetFilters = () => {
+    setFilterStatus('all');
+    setAtsThreshold(DEFAULT_ATS_THRESHOLD);
+    setSkillSearch('');
+  };
+
+  const normalizedSkillSearch = skillSearch.trim().toLowerCase();
+
+  const filteredCandidates = candidates
+    .filter(c => {
+      if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+      if (c.atsScore < atsThreshold) return false;
+      if (normalizedSkillSearch && !c.skills.some(skill => skill.toLowerCase().includes(normalizedSkillSearch))) return false;
+      return true;
+    })
+    .sort((a, b) => b.atsScore - a.atsScore);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600 bg-green-100';
@@ -274,42 +290,83 @@ export const HireSmart: React.FC = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-2">
-              <Filter className="w-5 h-5 text-gray-500" />
-              <span className="font-medium text-gray-700">Filters:</span>
+          <div className="flex flex-col space-y-4">
+            <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <span className="font-medium text-gray-700">Filters:</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">Status:</label>
+                <select
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="shortlisted">Shortlisted</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">ATS Threshold:</label>
+                <input
+                  type="range"
+                  min={MIN_ATS_THRESHOLD}
+                  max={MAX_ATS_THRESHOLD}
+                  value={atsThreshold}
+                  onChange={e => setAtsThreshold(Number(e.target.value))}
+                  className="w-32"
+                />
+                <span className="text-sm font-semibold text-blue-600">{atsThreshold}%</span>
+              </div>
+
+              <div className="ml-auto text-sm text-gray-600 text-right flex items-center gap-3">
+                <div>
+                  <p>
+                    Showing <span className="font-semibold">{filteredCandidates.length}</span> of <span className="font-semibold">{candidates.length}</span> candidates
+                  </p>
+                  {normalizedSkillSearch && (
+                    <p className="text-xs text-indigo-600 font-medium mt-1">
+                      Skill filter: <span className="font-semibold">{skillSearch.trim()}</span> · Sorted by ATS score
+                    </p>
+                  )}
+                </div>
+                {(filterStatus !== 'all' || atsThreshold !== DEFAULT_ATS_THRESHOLD || skillSearch) && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">Status:</label>
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="shortlisted">Shortlisted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">ATS Threshold:</label>
-              <input
-                type="range"
-                min="60"
-                max="90"
-                value={atsThreshold}
-                onChange={e => setAtsThreshold(Number(e.target.value))}
-                className="w-32"
-              />
-              <span className="text-sm font-semibold text-blue-600">{atsThreshold}%</span>
-            </div>
-
-            <div className="ml-auto">
-              <p className="text-sm text-gray-600">
-                Showing <span className="font-semibold">{filteredCandidates.length}</span> of <span className="font-semibold">{candidates.length}</span> candidates
+            <div className="flex flex-wrap items-center gap-3 justify-between">
+              <div className="relative flex-1 min-w-[220px] max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by skills (e.g., React, Python, Java)..."
+                  value={skillSearch}
+                  onChange={e => setSkillSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+                {skillSearch && (
+                  <button
+                    onClick={() => setSkillSearch('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                Results are ordered by highest ATS score.
               </p>
             </div>
           </div>
@@ -320,11 +377,31 @@ export const HireSmart: React.FC = () => {
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Candidates Found</h3>
-            <p className="text-gray-600 mb-6">Upload resumes to get started with AI-powered candidate screening.</p>
-            <Button onClick={() => fileInputRef.current?.click()} variant="primary">
-              <Upload className="w-5 h-5 mr-2" />
-              Upload Resumes
-            </Button>
+            <p className="text-gray-600 mb-6">
+              {candidates.length === 0
+                ? 'Upload resumes to get started with AI-powered candidate screening.'
+                : 'No candidates match the current filters. Try adjusting the status, ATS threshold, or skill search to see more results.'}
+            </p>
+            {candidates.length === 0 ? (
+              <Button onClick={() => fileInputRef.current?.click()} variant="primary">
+                <Upload className="w-5 h-5 mr-2" />
+                Upload Resumes
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  onClick={handleResetFilters}
+                  variant="outline"
+                  className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                >
+                  Clear Filters
+                </Button>
+                <Button onClick={() => fileInputRef.current?.click()} variant="primary">
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload More Resumes
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -352,11 +429,21 @@ export const HireSmart: React.FC = () => {
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 mb-2">Skills:</p>
                     <div className="flex flex-wrap gap-2">
-                      {candidate.skills.map((skill, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-                          {skill}
-                        </span>
-                      ))}
+                      {candidate.skills.map((skill, idx) => {
+                        const isMatch = normalizedSkillSearch.length > 0 && skill.toLowerCase().includes(normalizedSkillSearch);
+                        return (
+                          <span
+                            key={idx}
+                            className={`px-2 py-1 rounded text-xs ${
+                              isMatch
+                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}
+                          >
+                            {skill}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -479,11 +566,21 @@ export const HireSmart: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-500 mb-2">Skills</p>
                     <div className="flex flex-wrap gap-2">
-                      {selectedCandidate.skills.map((skill, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                          {skill}
-                        </span>
-                      ))}
+                      {selectedCandidate.skills.map((skill, idx) => {
+                        const isMatch = normalizedSkillSearch.length > 0 && skill.toLowerCase().includes(normalizedSkillSearch);
+                        return (
+                          <span
+                            key={idx}
+                            className={`px-3 py-1 rounded-full text-sm ${
+                              isMatch
+                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
+                            {skill}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
