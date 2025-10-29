@@ -3,7 +3,9 @@ export interface ExternalCandidate {
   name: string;
   email: string;
   phone: string;
-  profileUrl: string;
+  profileUrl?: string | null;
+  externalViewAvailable?: boolean;
+  externalViewMessage?: string;
   skills: string[];
   experience: number;
   currentCompany?: string;

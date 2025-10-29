@@ -32,7 +32,8 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Track invitation status (discovered → invited → applied)
 - Save and manage external candidates
 - Real-time notifications on invitations
-- View external profiles with one click
+- LinkedIn profiles: Direct external link viewing
+- Naukri profiles: Detailed modal view (external links not available due to platform restrictions)
 
 ### 4. **AutoMatch - AI-Powered Job Matching**
 - Create job postings with requirements
