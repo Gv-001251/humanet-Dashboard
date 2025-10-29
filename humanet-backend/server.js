@@ -124,7 +124,787 @@ let employees = [
     skills: ['Python', 'TensorFlow', 'Data Analysis', 'Machine Learning'],
     experience: 5,
     availability: 'Available',
-    department: 'Data Science'
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-4',
+    name: 'Arjun Nair',
+    email: 'arjun@humanet.com',
+    role: 'Backend Engineer',
+    skills: ['Node.js', 'Python', 'PostgreSQL', 'Docker'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-5',
+    name: 'Meera Patel',
+    email: 'meera@humanet.com',
+    role: 'DevOps Engineer',
+    skills: ['AWS', 'Kubernetes', 'CI/CD', 'Terraform'],
+    experience: 5,
+    availability: 'Partially Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-6',
+    name: 'Vikram Desai',
+    email: 'vikram@humanet.com',
+    role: 'Frontend Developer',
+    skills: ['React', 'JavaScript', 'CSS', 'HTML'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-7',
+    name: 'Sneha Rao',
+    email: 'sneha@humanet.com',
+    role: 'QA Engineer',
+    skills: ['Testing', 'Automation', 'Selenium', 'JIRA'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-8',
+    name: 'Karthik Kumar',
+    email: 'karthik@humanet.com',
+    role: 'UI/UX Designer',
+    skills: ['Figma', 'Adobe XD', 'Sketch', 'Prototyping'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-9',
+    name: 'Divya Menon',
+    email: 'divya@humanet.com',
+    role: 'Product Manager',
+    skills: ['Product Strategy', 'Agile', 'Market Research', 'Analytics'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-10',
+    name: 'Ravi Iyer',
+    email: 'ravi@humanet.com',
+    role: 'Tech Lead',
+    skills: ['System Design', 'Architecture', 'Leadership', 'Microservices'],
+    experience: 8,
+    availability: 'Partially Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-11',
+    name: 'Lakshmi Reddy',
+    email: 'lakshmi@humanet.com',
+    role: 'Machine Learning Engineer',
+    skills: ['Python', 'PyTorch', 'Deep Learning', 'NLP'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-12',
+    name: 'Sanjay Pillai',
+    email: 'sanjay@humanet.com',
+    role: 'Data Engineer',
+    skills: ['Spark', 'Hadoop', 'Kafka', 'Python'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-13',
+    name: 'Pooja Gupta',
+    email: 'pooja@humanet.com',
+    role: 'Frontend Engineer',
+    skills: ['Vue.js', 'TypeScript', 'Tailwind CSS', 'Testing'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-14',
+    name: 'Aditya Sharma',
+    email: 'aditya@humanet.com',
+    role: 'Security Engineer',
+    skills: ['Cybersecurity', 'Penetration Testing', 'Network Security', 'OWASP'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-15',
+    name: 'Kavya Krishnan',
+    email: 'kavya@humanet.com',
+    role: 'Mobile Developer',
+    skills: ['React Native', 'iOS', 'Android', 'Swift'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-16',
+    name: 'Manish Joshi',
+    email: 'manish@humanet.com',
+    role: 'Cloud Architect',
+    skills: ['AWS', 'Azure', 'GCP', 'Cloud Migration'],
+    experience: 7,
+    availability: 'Partially Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-17',
+    name: 'Nisha Malhotra',
+    email: 'nisha@humanet.com',
+    role: 'Backend Developer',
+    skills: ['Java', 'Spring Boot', 'MySQL', 'Redis'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-18',
+    name: 'Rohan Agarwal',
+    email: 'rohan@humanet.com',
+    role: 'Site Reliability Engineer',
+    skills: ['Monitoring', 'Logging', 'Incident Management', 'Automation'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-19',
+    name: 'Shreya Bhat',
+    email: 'shreya@humanet.com',
+    role: 'Business Analyst',
+    skills: ['Requirements Gathering', 'Documentation', 'Stakeholder Management', 'SQL'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-20',
+    name: 'Tarun Mehta',
+    email: 'tarun@humanet.com',
+    role: 'Database Administrator',
+    skills: ['PostgreSQL', 'MySQL', 'MongoDB', 'Database Optimization'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-21',
+    name: 'Usha Venkat',
+    email: 'usha@humanet.com',
+    role: 'Scrum Master',
+    skills: ['Agile', 'Scrum', 'Team Facilitation', 'Project Management'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-22',
+    name: 'Vinay Subramanian',
+    email: 'vinay@humanet.com',
+    role: 'Full Stack Developer',
+    skills: ['MEAN Stack', 'Angular', 'Node.js', 'MongoDB'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-23',
+    name: 'Yamini Rao',
+    email: 'yamini@humanet.com',
+    role: 'Data Analyst',
+    skills: ['SQL', 'Power BI', 'Excel', 'Python'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-24',
+    name: 'Zara Khan',
+    email: 'zara@humanet.com',
+    role: 'Technical Writer',
+    skills: ['Documentation', 'API Documentation', 'Technical Writing', 'Markdown'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-25',
+    name: 'Amit Verma',
+    email: 'amit.verma@humanet.com',
+    role: 'Engineering Manager',
+    skills: ['Team Leadership', 'Hiring', 'Mentoring', 'Agile'],
+    experience: 9,
+    availability: 'Partially Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-26',
+    name: 'Bhavana Nair',
+    email: 'bhavana@humanet.com',
+    role: 'Test Automation Engineer',
+    skills: ['Cypress', 'Jest', 'Playwright', 'CI/CD'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-27',
+    name: 'Chetan Deshmukh',
+    email: 'chetan@humanet.com',
+    role: 'Solutions Architect',
+    skills: ['System Design', 'Enterprise Architecture', 'Consulting', 'AWS'],
+    experience: 8,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-28',
+    name: 'Deepak Choudhury',
+    email: 'deepak@humanet.com',
+    role: 'Infrastructure Engineer',
+    skills: ['Linux', 'Networking', 'Infrastructure as Code', 'Ansible'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-29',
+    name: 'Esha Malhotra',
+    email: 'esha@humanet.com',
+    role: 'Release Manager',
+    skills: ['Release Management', 'Deployment', 'Version Control', 'Git'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-30',
+    name: 'Faisal Ahmed',
+    email: 'faisal@humanet.com',
+    role: 'Blockchain Developer',
+    skills: ['Solidity', 'Ethereum', 'Smart Contracts', 'Web3'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-31',
+    name: 'Gitanjali Singh',
+    email: 'gitanjali@humanet.com',
+    role: 'Performance Engineer',
+    skills: ['Performance Testing', 'JMeter', 'Load Testing', 'Optimization'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-32',
+    name: 'Harish Reddy',
+    email: 'harish@humanet.com',
+    role: 'AI/ML Researcher',
+    skills: ['Research', 'Deep Learning', 'Computer Vision', 'Papers'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-33',
+    name: 'Isha Kapoor',
+    email: 'isha@humanet.com',
+    role: 'API Developer',
+    skills: ['REST APIs', 'GraphQL', 'API Design', 'Microservices'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-34',
+    name: 'Jayesh Patel',
+    email: 'jayesh@humanet.com',
+    role: 'Game Developer',
+    skills: ['Unity', 'C#', 'Game Design', '3D Graphics'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-35',
+    name: 'Kirti Jain',
+    email: 'kirti@humanet.com',
+    role: 'Embedded Systems Engineer',
+    skills: ['C', 'C++', 'IoT', 'Embedded Systems'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-36',
+    name: 'Lokesh Yadav',
+    email: 'lokesh@humanet.com',
+    role: 'Network Engineer',
+    skills: ['Networking', 'Cisco', 'Routers', 'Switches'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-37',
+    name: 'Madhuri Kulkarni',
+    email: 'madhuri@humanet.com',
+    role: 'ETL Developer',
+    skills: ['ETL', 'Data Warehousing', 'SQL', 'Informatica'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-38',
+    name: 'Naveen Kumar',
+    email: 'naveen@humanet.com',
+    role: 'Salesforce Developer',
+    skills: ['Salesforce', 'Apex', 'Lightning', 'CRM'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-39',
+    name: 'Omkar Shinde',
+    email: 'omkar@humanet.com',
+    role: 'Graphics Developer',
+    skills: ['OpenGL', 'WebGL', 'Three.js', 'Graphics Programming'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-40',
+    name: 'Pradeep Mishra',
+    email: 'pradeep@humanet.com',
+    role: 'Integration Engineer',
+    skills: ['API Integration', 'Middleware', 'SOA', 'ESB'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-41',
+    name: 'Qamar Ali',
+    email: 'qamar@humanet.com',
+    role: 'ERP Developer',
+    skills: ['SAP', 'ERP', 'ABAP', 'Business Process'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-42',
+    name: 'Rajiv Sharma',
+    email: 'rajiv@humanet.com',
+    role: 'Support Engineer',
+    skills: ['Technical Support', 'Troubleshooting', 'Customer Service', 'Linux'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-43',
+    name: 'Sapna Desai',
+    email: 'sapna@humanet.com',
+    role: 'Compliance Engineer',
+    skills: ['Compliance', 'Security Standards', 'Auditing', 'GDPR'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-44',
+    name: 'Tanvi Saxena',
+    email: 'tanvi@humanet.com',
+    role: 'Accessibility Engineer',
+    skills: ['Accessibility', 'WCAG', 'Screen Readers', 'Inclusive Design'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-45',
+    name: 'Umesh Rao',
+    email: 'umesh@humanet.com',
+    role: 'Platform Engineer',
+    skills: ['Platform Engineering', 'Kubernetes', 'Service Mesh', 'Infrastructure'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Engineering'
+  },
+  {
+    id: 'emp-46',
+    name: 'Gayathri G',
+    email: 'gayathri@humanet.com',
+    role: 'HR Manager',
+    skills: ['Recruitment', 'HR Operations', 'Employee Relations', 'HRIS'],
+    experience: 7,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-47',
+    name: 'Varun Kapoor',
+    email: 'varun@humanet.com',
+    role: 'Talent Acquisition Specialist',
+    skills: ['Hiring', 'Interviewing', 'Sourcing', 'ATS'],
+    experience: 4,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-48',
+    name: 'Wasim Khan',
+    email: 'wasim@humanet.com',
+    role: 'HR Business Partner',
+    skills: ['HR Strategy', 'Change Management', 'People Analytics', 'Leadership'],
+    experience: 6,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-49',
+    name: 'Xena Dsouza',
+    email: 'xena@humanet.com',
+    role: 'L&D Specialist',
+    skills: ['Training', 'Learning Management', 'Employee Development', 'Coaching'],
+    experience: 5,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-50',
+    name: 'Yash Patil',
+    email: 'yash@humanet.com',
+    role: 'Compensation Analyst',
+    skills: ['Compensation Planning', 'Benefits', 'Market Research', 'Excel'],
+    experience: 4,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-51',
+    name: 'Zoya Mirza',
+    email: 'zoya@humanet.com',
+    role: 'Recruiter',
+    skills: ['Recruitment', 'LinkedIn', 'Job Postings', 'Candidate Screening'],
+    experience: 3,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-52',
+    name: 'Aarav Mehta',
+    email: 'aarav@humanet.com',
+    role: 'Employee Relations Manager',
+    skills: ['Conflict Resolution', 'Employee Engagement', 'Policy', 'Communication'],
+    experience: 6,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-53',
+    name: 'Bella Fernandes',
+    email: 'bella@humanet.com',
+    role: 'HRIS Analyst',
+    skills: ['HRIS Systems', 'Workday', 'Data Management', 'Reporting'],
+    experience: 4,
+    availability: 'Available',
+    department: 'HR'
+  },
+  {
+    id: 'emp-54',
+    name: 'Chirag Gupta',
+    email: 'chirag.g@humanet.com',
+    role: 'Sales Manager',
+    skills: ['Sales Strategy', 'Client Relations', 'Negotiation', 'CRM'],
+    experience: 7,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-55',
+    name: 'Diya Sharma',
+    email: 'diya@humanet.com',
+    role: 'Business Development Executive',
+    skills: ['Lead Generation', 'Prospecting', 'Sales', 'Communication'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-56',
+    name: 'Ekta Rao',
+    email: 'ekta@humanet.com',
+    role: 'Account Manager',
+    skills: ['Account Management', 'Customer Success', 'Relationship Building', 'Sales'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-57',
+    name: 'Farhan Siddiqui',
+    email: 'farhan@humanet.com',
+    role: 'Sales Executive',
+    skills: ['Sales', 'Product Demo', 'Closing', 'Presentations'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-58',
+    name: 'Garima Joshi',
+    email: 'garima@humanet.com',
+    role: 'Inside Sales Representative',
+    skills: ['Inside Sales', 'Cold Calling', 'Email Campaigns', 'CRM'],
+    experience: 2,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-59',
+    name: 'Himanshu Verma',
+    email: 'himanshu@humanet.com',
+    role: 'Regional Sales Manager',
+    skills: ['Territory Management', 'Sales Leadership', 'B2B Sales', 'Forecasting'],
+    experience: 8,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-60',
+    name: 'Ishani Kulkarni',
+    email: 'ishani@humanet.com',
+    role: 'Customer Success Manager',
+    skills: ['Customer Success', 'Onboarding', 'Retention', 'Product Knowledge'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-61',
+    name: 'Jai Prakash',
+    email: 'jai@humanet.com',
+    role: 'Sales Operations Analyst',
+    skills: ['Sales Analytics', 'Reporting', 'Process Optimization', 'CRM Administration'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-62',
+    name: 'Kiran Bhat',
+    email: 'kiran@humanet.com',
+    role: 'Sales Coordinator',
+    skills: ['Sales Support', 'Coordination', 'Documentation', 'CRM'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-63',
+    name: 'Lavanya Reddy',
+    email: 'lavanya@humanet.com',
+    role: 'Enterprise Sales Director',
+    skills: ['Enterprise Sales', 'Strategic Accounts', 'Sales Leadership', 'Partnerships'],
+    experience: 10,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-64',
+    name: 'Mohit Agarwal',
+    email: 'mohit@humanet.com',
+    role: 'Channel Sales Manager',
+    skills: ['Channel Management', 'Partner Relations', 'Sales Strategy', 'Negotiation'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-65',
+    name: 'Neha Iyer',
+    email: 'neha.iyer@humanet.com',
+    role: 'Pre-Sales Engineer',
+    skills: ['Pre-Sales', 'Technical Demos', 'Solution Design', 'Presentations'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Sales'
+  },
+  {
+    id: 'emp-66',
+    name: 'Omar Sheikh',
+    email: 'omar@humanet.com',
+    role: 'Marketing Manager',
+    skills: ['Marketing Strategy', 'Campaign Management', 'Digital Marketing', 'Analytics'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-67',
+    name: 'Palak Singh',
+    email: 'palak@humanet.com',
+    role: 'Content Marketing Specialist',
+    skills: ['Content Creation', 'SEO', 'Copywriting', 'Social Media'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-68',
+    name: 'Qasim Ali',
+    email: 'qasim@humanet.com',
+    role: 'Digital Marketing Executive',
+    skills: ['Google Ads', 'Facebook Ads', 'PPC', 'Analytics'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-69',
+    name: 'Ritu Desai',
+    email: 'ritu@humanet.com',
+    role: 'Brand Manager',
+    skills: ['Brand Strategy', 'Brand Identity', 'Marketing', 'Creative Direction'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-70',
+    name: 'Sahil Khanna',
+    email: 'sahil@humanet.com',
+    role: 'Social Media Manager',
+    skills: ['Social Media', 'Community Management', 'Content Strategy', 'Analytics'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-71',
+    name: 'Tanuja Menon',
+    email: 'tanuja@humanet.com',
+    role: 'Marketing Analytics Manager',
+    skills: ['Marketing Analytics', 'Data Visualization', 'Google Analytics', 'SQL'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-72',
+    name: 'Udit Sharma',
+    email: 'udit@humanet.com',
+    role: 'SEO Specialist',
+    skills: ['SEO', 'Keyword Research', 'Link Building', 'Content Optimization'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-73',
+    name: 'Vidya Pillai',
+    email: 'vidya@humanet.com',
+    role: 'Email Marketing Manager',
+    skills: ['Email Marketing', 'Campaign Automation', 'A/B Testing', 'Mailchimp'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-74',
+    name: 'Wahid Rahman',
+    email: 'wahid@humanet.com',
+    role: 'Growth Marketing Manager',
+    skills: ['Growth Hacking', 'Experimentation', 'Funnel Optimization', 'Analytics'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-75',
+    name: 'Xavier D\'Souza',
+    email: 'xavier@humanet.com',
+    role: 'Product Marketing Manager',
+    skills: ['Product Marketing', 'Go-to-Market', 'Positioning', 'Product Launches'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Marketing'
+  },
+  {
+    id: 'emp-76',
+    name: 'Yashika Malhotra',
+    email: 'yashika@humanet.com',
+    role: 'Finance Manager',
+    skills: ['Financial Planning', 'Budgeting', 'Forecasting', 'Financial Analysis'],
+    experience: 7,
+    availability: 'Available',
+    department: 'Finance'
+  },
+  {
+    id: 'emp-77',
+    name: 'Zaheer Khan',
+    email: 'zaheer@humanet.com',
+    role: 'Accountant',
+    skills: ['Accounting', 'Bookkeeping', 'Financial Reporting', 'Tally'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Finance'
+  },
+  {
+    id: 'emp-78',
+    name: 'Aditi Menon',
+    email: 'aditi.menon@humanet.com',
+    role: 'Financial Analyst',
+    skills: ['Financial Modeling', 'Excel', 'Analysis', 'Reporting'],
+    experience: 3,
+    availability: 'Available',
+    department: 'Finance'
+  },
+  {
+    id: 'emp-79',
+    name: 'Brijesh Patel',
+    email: 'brijesh@humanet.com',
+    role: 'Tax Consultant',
+    skills: ['Tax Planning', 'GST', 'Income Tax', 'Compliance'],
+    experience: 6,
+    availability: 'Available',
+    department: 'Finance'
+  },
+  {
+    id: 'emp-80',
+    name: 'Chandni Rao',
+    email: 'chandni@humanet.com',
+    role: 'Payroll Specialist',
+    skills: ['Payroll Processing', 'Benefits Administration', 'Compliance', 'Excel'],
+    experience: 4,
+    availability: 'Available',
+    department: 'Finance'
+  },
+  {
+    id: 'emp-81',
+    name: 'Danish Shaikh',
+    email: 'danish@humanet.com',
+    role: 'Treasury Analyst',
+    skills: ['Cash Management', 'Treasury Operations', 'Risk Management', 'Financial Analysis'],
+    experience: 5,
+    availability: 'Available',
+    department: 'Finance'
   }
 ];
 
@@ -613,7 +1393,97 @@ app.get('/api/analytics/employees', authenticate, (req, res) => {
 });
 
 app.get('/api/analytics/activities', authenticate, (req, res) => {
-  res.json({ success: true, data: analyticsActivities });
+  const recentActivities = [];
+  
+  const now = new Date();
+  const thisMonth = candidates.filter(c => {
+    if (!c.createdAt) return false;
+    const createdAt = new Date(c.createdAt);
+    return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+  });
+  
+  if (thisMonth.length > 0) {
+    const latest = thisMonth.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    recentActivities.push({
+      id: `act-cand-${latest.id}`,
+      text: `New candidate shortlisted: ${latest.name}`,
+      time: '10 mins ago',
+      type: 'candidate'
+    });
+  }
+  
+  const recentProjects = projects.filter(p => p.progress > 0 && p.progress < 100).slice(0, 2);
+  if (recentProjects.length > 0) {
+    recentActivities.push({
+      id: `act-proj-${recentProjects[0].id}`,
+      text: `Project "${recentProjects[0].title}" in progress at ${recentProjects[0].progress}%`,
+      time: '1 hour ago',
+      type: 'project'
+    });
+  }
+  
+  const shortlistedCandidates = candidates.filter(c => c.status === 'shortlisted');
+  if (shortlistedCandidates.length > 0) {
+    recentActivities.push({
+      id: `act-offer-${shortlistedCandidates[0].id}`,
+      text: `Offer sent to ${shortlistedCandidates[0].name}`,
+      time: '2 hours ago',
+      type: 'offer'
+    });
+  }
+  
+  if (employees.length > 0) {
+    const recentEmployee = employees[Math.floor(Math.random() * Math.min(5, employees.length))];
+    recentActivities.push({
+      id: `act-emp-${recentEmployee.id}`,
+      text: `New employee onboarded: ${recentEmployee.name}`,
+      time: '5 hours ago',
+      type: 'employee'
+    });
+  }
+  
+  if (salaryPredictions.length > 0) {
+    recentActivities.push({
+      id: `act-sal-${salaryPredictions[0].id}`,
+      text: `Salary prediction saved for ${salaryPredictions[0].role || 'Data Analyst role'}`,
+      time: '1 day ago',
+      type: 'salary'
+    });
+  } else {
+    recentActivities.push({
+      id: 'act-sal-default',
+      text: 'Salary prediction saved for Data Analyst role',
+      time: '1 day ago',
+      type: 'salary'
+    });
+  }
+  
+  res.json({ success: true, data: recentActivities.slice(0, 5) });
+});
+
+app.get('/api/analytics/salary-expenses', authenticate, (req, res) => {
+  const avgSalaryPerEmployee = 520000;
+  const totalEmployees = employees.length;
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const salaryData = [];
+  
+  for (let i = 5; i >= 0; i--) {
+    const monthIndex = (currentMonth - i + 12) % 12;
+    const baseAmount = totalEmployees * avgSalaryPerEmployee;
+    const growthFactor = 1 + (5 - i) * 0.025;
+    const randomVariation = 0.98 + Math.random() * 0.04;
+    const amount = Math.round(baseAmount * growthFactor * randomVariation);
+    
+    salaryData.push({
+      month: monthNames[monthIndex],
+      amount
+    });
+  }
+  
+  res.json({ success: true, data: salaryData });
 });
 
 app.post('/api/messages/send-email', authenticate, (req, res) => {
