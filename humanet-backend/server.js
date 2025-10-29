@@ -1,19 +1,13 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser');
 const compression = require('compression');
-const xssClean = require('xss-clean');
-const hpp = require('hpp');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
-const { connectDB, getDB } = require('./src/config/mongodb');
+const { connectDB } = require('./src/config/mongodb');
 const {
   predictSalary,
   getMarketComparison,
@@ -21,44 +15,6 @@ const {
   formatSalary,
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
-const {
-  initializeUserStore,
-  getAllUsers,
-  findUserById,
-  addUser,
-  updateUser,
-  sanitizeUser
-} = require('./src/data/userStore');
-const authRoutes = require('./src/routes/authRoutes');
-const { authenticate } = require('./src/middleware/authMiddleware');
-const { cleanupExpiredTokens } = require('./src/utils/jwtUtils');
-
-const createMongoSanitizeMiddleware = (options = {}) => {
-  const hasOnSanitize = typeof options.onSanitize === 'function';
-
-  const sanitizeSection = (req, key) => {
-    const value = req[key];
-
-    if (!value || typeof value !== 'object') {
-      return;
-    }
-
-    const hadProhibitedKeys = mongoSanitize.has(value, options.allowDots);
-    mongoSanitize.sanitize(value, options);
-
-    if (hadProhibitedKeys && hasOnSanitize) {
-      options.onSanitize({ req, key });
-    }
-  };
-
-  return (req, res, next) => {
-    sanitizeSection(req, 'body');
-    sanitizeSection(req, 'params');
-    sanitizeSection(req, 'headers');
-    sanitizeSection(req, 'query');
-    next();
-  };
-};
 
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
@@ -78,7 +34,6 @@ const ensureUploadsDirExists = () => {
 ensureUploadsDirExists();
 
 const app = express();
-app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
 const corsOptions = {
@@ -87,41 +42,10 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-}));
-
 app.use(cors(corsOptions));
-app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(createMongoSanitizeMiddleware());
-app.use(xssClean());
-app.use(hpp());
 app.use(compression());
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api/', limiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many authentication attempts, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-app.use((req, res, next) => {
-  req.db = getDB();
-  next();
-});
 
 app.use('/uploads', express.static(uploadsDir));
 
@@ -225,8 +149,6 @@ const initializeDatabase = async () => {
   try {
     const db = await connectDB();
 
-    await initializeUserStore(db);
-
     if (!db) {
       return;
     }
@@ -250,7 +172,6 @@ const initializeDatabase = async () => {
   } catch (error) {
     console.error('Failed to initialize database:', error);
     candidateCollection = null;
-    await initializeUserStore(null);
   }
 };
 
@@ -384,16 +305,6 @@ let employees = [
     role: 'Frontend Engineer',
     skills: ['Vue.js', 'TypeScript', 'Tailwind CSS', 'Testing'],
     experience: 3,
-    availability: 'Available',
-    department: 'Engineering'
-  },
-  {
-    id: 'emp-14',
-    name: 'Aditya Sharma',
-    email: 'aditya@humanet.com',
-    role: 'Security Engineer',
-    skills: ['Cybersecurity', 'Penetration Testing', 'Network Security', 'OWASP'],
-    experience: 6,
     availability: 'Available',
     department: 'Engineering'
   },
@@ -1218,18 +1129,7 @@ const deleteResumeFile = resumeUrl => {
   }
 };
 
-app.use('/api/auth', authLimiter, authRoutes);
-
-setInterval(() => {
-  try {
-    const db = getDB();
-    cleanupExpiredTokens(db);
-  } catch (error) {
-    console.error('Token cleanup error:', error);
-  }
-}, 60 * 60 * 1000);
-
-app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), async (req, res) => {
+app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res) => {
   try {
     const files = req.files || [];
     const parsedCandidates = [];
@@ -1402,7 +1302,7 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
   }
 });
 
-app.get('/api/candidates', authenticate, async (req, res) => {
+app.get('/api/candidates', async (req, res) => {
   try {
     await refreshCandidatesFromDB();
     res.json({ success: true, data: candidates });
@@ -1412,7 +1312,7 @@ app.get('/api/candidates', authenticate, async (req, res) => {
   }
 });
 
-app.get('/api/candidates/:id', authenticate, async (req, res) => {
+app.get('/api/candidates/:id', async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1442,7 +1342,7 @@ app.get('/api/candidates/:id', authenticate, async (req, res) => {
   }
 });
 
-app.put('/api/candidates/:id/status', authenticate, async (req, res) => {
+app.put('/api/candidates/:id/status', async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1496,7 +1396,7 @@ app.put('/api/candidates/:id/status', authenticate, async (req, res) => {
   }
 });
 
-app.delete('/api/candidates/:id', authenticate, async (req, res) => {
+app.delete('/api/candidates/:id', async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1536,7 +1436,7 @@ app.delete('/api/candidates/:id', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/projects', authenticate, (req, res) => {
+app.post('/api/projects', (req, res) => {
   const project = {
     id: `proj-${Date.now()}`,
     ...req.body,
@@ -1548,11 +1448,11 @@ app.post('/api/projects', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.get('/api/projects', authenticate, (req, res) => {
+app.get('/api/projects', (req, res) => {
   res.json({ success: true, data: projects });
 });
 
-app.get('/api/projects/:id', authenticate, (req, res) => {
+app.get('/api/projects/:id', (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1560,7 +1460,7 @@ app.get('/api/projects/:id', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.post('/api/projects/:id/match', authenticate, (req, res) => {
+app.post('/api/projects/:id/match', (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1586,7 +1486,7 @@ app.post('/api/projects/:id/match', authenticate, (req, res) => {
   res.json({ success: true, data: matches.slice(0, project.teamSize || 3) });
 });
 
-app.post('/api/projects/:id/assign', authenticate, (req, res) => {
+app.post('/api/projects/:id/assign', (req, res) => {
   const { employeeIds } = req.body;
   const project = projects.find(p => p.id === req.params.id);
 
@@ -1613,7 +1513,7 @@ app.post('/api/projects/:id/assign', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.put('/api/projects/:id/progress', authenticate, (req, res) => {
+app.put('/api/projects/:id/progress', (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1623,7 +1523,7 @@ app.put('/api/projects/:id/progress', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.post('/api/salary/predict', authenticate, (req, res) => {
+app.post('/api/salary/predict', (req, res) => {
   const { role, skills = '', experience = 0, location = 'Bangalore', industry = 'IT', companySize = 'Medium', education = 'Bachelor' } = req.body;
 
   const expYears = parseInt(experience, 10) || 0;
@@ -1657,7 +1557,7 @@ app.post('/api/salary/predict', authenticate, (req, res) => {
   });
 });
 
-app.post('/api/salary/save', authenticate, (req, res) => {
+app.post('/api/salary/save', (req, res) => {
   const prediction = {
     id: `pred-${Date.now()}`,
     ...req.body,
@@ -1667,11 +1567,11 @@ app.post('/api/salary/save', authenticate, (req, res) => {
   res.json({ success: true, data: prediction });
 });
 
-app.get('/api/salary/history', authenticate, (req, res) => {
+app.get('/api/salary/history', (req, res) => {
   res.json({ success: true, data: salaryPredictions });
 });
 
-app.delete('/api/salary/:id', authenticate, (req, res) => {
+app.delete('/api/salary/:id', (req, res) => {
   const index = salaryPredictions.findIndex(p => p.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'Prediction not found' });
@@ -1680,7 +1580,7 @@ app.delete('/api/salary/:id', authenticate, (req, res) => {
   res.json({ success: true, message: 'Prediction removed' });
 });
 
-app.get('/api/analytics/overview', authenticate, (req, res) => {
+app.get('/api/analytics/overview', (req, res) => {
   const now = new Date();
   const activeProjectsCount = projects.filter(project => project.progress > 0 && project.progress < 100).length;
 
@@ -1699,7 +1599,7 @@ app.get('/api/analytics/overview', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/hiring-funnel', authenticate, (req, res) => {
+app.get('/api/analytics/hiring-funnel', (req, res) => {
   const total = candidates.length;
   res.json({
     success: true,
@@ -1713,7 +1613,7 @@ app.get('/api/analytics/hiring-funnel', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/projects', authenticate, (req, res) => {
+app.get('/api/analytics/projects', (req, res) => {
   res.json({
     success: true,
     data: projects.map(project => ({
@@ -1726,7 +1626,7 @@ app.get('/api/analytics/projects', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/employees', authenticate, (req, res) => {
+app.get('/api/analytics/employees', (req, res) => {
   const departmentCounts = employees.reduce((acc, emp) => {
     acc[emp.department] = (acc[emp.department] || 0) + 1;
     return acc;
@@ -1735,7 +1635,7 @@ app.get('/api/analytics/employees', authenticate, (req, res) => {
   res.json({ success: true, data: departmentCounts });
 });
 
-app.get('/api/analytics/activities', authenticate, (req, res) => {
+app.get('/api/analytics/activities', (req, res) => {
   const recentActivities = [];
   
   const now = new Date();
@@ -1804,7 +1704,7 @@ app.get('/api/analytics/activities', authenticate, (req, res) => {
   res.json({ success: true, data: recentActivities.slice(0, 5) });
 });
 
-app.get('/api/analytics/salary-expenses', authenticate, (req, res) => {
+app.get('/api/analytics/salary-expenses', (req, res) => {
   const avgSalaryPerEmployee = 520000;
   const totalEmployees = employees.length;
   const now = new Date();
@@ -1829,7 +1729,7 @@ app.get('/api/analytics/salary-expenses', authenticate, (req, res) => {
   res.json({ success: true, data: salaryData });
 });
 
-app.post('/api/messages/send-email', authenticate, (req, res) => {
+app.post('/api/messages/send-email', (req, res) => {
   const { recipient, subject } = req.body;
 
   notifications.unshift({
@@ -1843,11 +1743,11 @@ app.post('/api/messages/send-email', authenticate, (req, res) => {
   res.json({ success: true, message: 'Email sent successfully' });
 });
 
-app.get('/api/messages/notifications', authenticate, (req, res) => {
+app.get('/api/messages/notifications', (req, res) => {
   res.json({ success: true, data: notifications });
 });
 
-app.put('/api/messages/:id/read', authenticate, (req, res) => {
+app.put('/api/messages/:id/read', (req, res) => {
   const notification = notifications.find(n => n.id === req.params.id);
   if (notification) {
     notification.read = true;
@@ -1855,109 +1755,18 @@ app.put('/api/messages/:id/read', authenticate, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/settings/profile', authenticate, (req, res) => {
-  const user = findUserById(req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
-  }
-  const safeUser = sanitizeUser(user);
-  res.json({ success: true, data: safeUser });
-});
-
-app.put('/api/settings/profile', authenticate, async (req, res) => {
-  try {
-    const updates = {};
-    if (req.body.name) updates.name = req.body.name;
-    
-    const user = await updateUser(req.user.id, updates);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    
-    const safeUser = sanitizeUser(user);
-    res.json({ success: true, data: safeUser });
-  } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ success: false, message: 'Error updating profile' });
-  }
-});
-
-app.get('/api/settings/users', authenticate, (req, res) => {
-  const allUsers = getAllUsers();
-  res.json({ success: true, data: allUsers });
-});
-
-app.post('/api/settings/users', authenticate, async (req, res) => {
-  try {
-    const { name, email, role, password } = req.body;
-    
-    if (!email || !name || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email, and password are required'
-      });
-    }
-
-    const user = await addUser({
-      name,
-      email,
-      role: role || 'employee',
-      password
-    });
-
-    const safeUser = sanitizeUser(user);
-    res.json({ success: true, data: safeUser });
-  } catch (error) {
-    console.error('Add user error:', error);
-    res.status(500).json({ success: false, message: 'Error adding user' });
-  }
-});
-
-app.put('/api/settings/users/:id', authenticate, async (req, res) => {
-  try {
-    const updates = {};
-    if (req.body.name) updates.name = req.body.name;
-    if (req.body.role) updates.role = req.body.role;
-    if (req.body.status) updates.status = req.body.status;
-    
-    const user = await updateUser(req.params.id, updates);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    
-    const safeUser = sanitizeUser(user);
-    res.json({ success: true, data: safeUser });
-  } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ success: false, message: 'Error updating user' });
-  }
-});
-
-app.delete('/api/settings/users/:id', authenticate, async (req, res) => {
-  try {
-    const user = await updateUser(req.params.id, { status: 'inactive' });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    res.json({ success: true, message: 'User deactivated successfully' });
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({ success: false, message: 'Error deactivating user' });
-  }
-});
-
-app.get('/api/settings/company', authenticate, (req, res) => {
+app.get('/api/settings/company', (req, res) => {
   res.json({ success: true, data: companySettings });
 });
 
-app.put('/api/settings/company', authenticate, (req, res) => {
+app.put('/api/settings/company', (req, res) => {
   companySettings.name = req.body.name || companySettings.name;
   companySettings.logoUrl = req.body.logoUrl || companySettings.logoUrl;
   companySettings.locations = req.body.locations || companySettings.locations;
   res.json({ success: true, data: companySettings });
 });
 
-app.get('/api/settings/ats', authenticate, (req, res) => {
+app.get('/api/settings/ats', (req, res) => {
   res.json({
     success: true,
     data: {
@@ -1967,7 +1776,7 @@ app.get('/api/settings/ats', authenticate, (req, res) => {
   });
 });
 
-app.put('/api/settings/ats', authenticate, (req, res) => {
+app.put('/api/settings/ats', (req, res) => {
   if (typeof req.body.atsThreshold === 'number') {
     companySettings.atsThreshold = req.body.atsThreshold;
   }
@@ -2242,7 +2051,7 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
   return results;
 };
 
-app.post('/api/talent-scout/search', authenticate, (req, res) => {
+app.post('/api/talent-scout/search', (req, res) => {
   try {
     const {
       platform,
@@ -2439,7 +2248,7 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
   }
 });
 
-app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
+app.get('/api/talent-scout/candidates', (req, res) => {
   const invitedCandidates = externalCandidates.filter(c => 
     (c.status === 'invited' || c.status === 'applied') && 
     AVAILABLE_AVAILABILITY_STATUSES.has(c.availability)
@@ -2447,7 +2256,7 @@ app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
   res.json({ success: true, data: invitedCandidates });
 });
 
-app.post('/api/talent-scout/invite', authenticate, (req, res) => {
+app.post('/api/talent-scout/invite', (req, res) => {
   try {
     const { candidateId, jobId, message } = req.body;
     
@@ -2485,7 +2294,7 @@ app.post('/api/talent-scout/invite', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/predict', authenticate, (req, res) => {
+app.post('/api/salary/predict', (req, res) => {
   try {
     const { experience, role, location, industry, skills, companySize } = req.body;
 
@@ -2518,7 +2327,7 @@ app.post('/api/salary/predict', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/market-comparison', authenticate, (req, res) => {
+app.post('/api/salary/market-comparison', (req, res) => {
   try {
     const { experience, role, location, industry, skills, companySize } = req.body;
 
@@ -2551,7 +2360,7 @@ app.post('/api/salary/market-comparison', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/check-fit', authenticate, (req, res) => {
+app.post('/api/salary/check-fit', (req, res) => {
   try {
     const { expectedSalary, budgetRange } = req.body;
 
