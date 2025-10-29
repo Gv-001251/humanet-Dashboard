@@ -328,16 +328,6 @@ Open your browser and navigate to `http://localhost:5173`
 ### Dashboard Routes
 - `GET /api/dashboard/stats` - Get dashboard statistics
 
-## 🔒 Security Features
-
-- Input validation on all forms
-- File upload validation (type, size limits)
-- MongoDB injection prevention
-- XSS protection
-- CORS configuration
-- Environment variables for sensitive data
-- Error handling without exposing internals
-
 ## ⚡ Performance Optimization
 
 - Lazy loading for large lists
