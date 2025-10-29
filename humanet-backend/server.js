@@ -1779,14 +1779,15 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
     };
     
     let results = [];
+    const resultsPerPlatform = req.body.resultsPerPlatform || 20;
     
     if (filters.platform === 'both' || filters.platform === 'linkedin') {
-      const linkedinResults = generateMockLinkedInCandidates(filters, 5);
+      const linkedinResults = generateMockLinkedInCandidates(filters, resultsPerPlatform);
       results = results.concat(linkedinResults);
     }
     
     if (filters.platform === 'both' || filters.platform === 'naukri') {
-      const naukriResults = generateMockNaukriCandidates(filters, 5);
+      const naukriResults = generateMockNaukriCandidates(filters, resultsPerPlatform);
       results = results.concat(naukriResults);
     }
     

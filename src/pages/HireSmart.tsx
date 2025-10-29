@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
-import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2, Search } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2, Search, X } from 'lucide-react';
 import { Button } from '../components/common/Button';
 
 interface Candidate {
@@ -26,7 +26,8 @@ export const HireSmart: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [atsThreshold, setAtsThreshold] = useState(DEFAULT_ATS_THRESHOLD);
-  const [skillSearch, setSkillSearch] = useState<string>('');
+  const [skillFilters, setSkillFilters] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -229,16 +230,36 @@ export const HireSmart: React.FC = () => {
   const handleResetFilters = () => {
     setFilterStatus('all');
     setAtsThreshold(DEFAULT_ATS_THRESHOLD);
-    setSkillSearch('');
+    setSkillFilters([]);
+    setSkillInput('');
   };
 
-  const normalizedSkillSearch = skillSearch.trim().toLowerCase();
+  const handleAddSkillFilter = () => {
+    const skill = skillInput.trim();
+    if (!skill) return;
+    const exists = skillFilters.some(existing => existing.toLowerCase() === skill.toLowerCase());
+    if (!exists) {
+      setSkillFilters([...skillFilters, skill]);
+    }
+    setSkillInput('');
+  };
+
+  const handleRemoveSkillFilter = (skill: string) => {
+    setSkillFilters(skillFilters.filter(s => s !== skill));
+  };
 
   const filteredCandidates = candidates
     .filter(c => {
       if (filterStatus !== 'all' && c.status !== filterStatus) return false;
       if (c.atsScore < atsThreshold) return false;
-      if (normalizedSkillSearch && !c.skills.some(skill => skill.toLowerCase().includes(normalizedSkillSearch))) return false;
+      if (skillFilters.length > 0) {
+        const hasAllSkills = skillFilters.every(filterSkill =>
+          c.skills.some(candidateSkill =>
+            candidateSkill.toLowerCase().includes(filterSkill.toLowerCase())
+          )
+        );
+        if (!hasAllSkills) return false;
+      }
       return true;
     })
     .sort((a, b) => b.atsScore - a.atsScore);
@@ -329,13 +350,13 @@ export const HireSmart: React.FC = () => {
                   <p>
                     Showing <span className="font-semibold">{filteredCandidates.length}</span> of <span className="font-semibold">{candidates.length}</span> candidates
                   </p>
-                  {normalizedSkillSearch && (
+                  {skillFilters.length > 0 && (
                     <p className="text-xs text-indigo-600 font-medium mt-1">
-                      Skill filter: <span className="font-semibold">{skillSearch.trim()}</span> · Sorted by ATS score
+                      Filtering by {skillFilters.length} skill{skillFilters.length > 1 ? 's' : ''} · Sorted by ATS score
                     </p>
                   )}
                 </div>
-                {(filterStatus !== 'all' || atsThreshold !== DEFAULT_ATS_THRESHOLD || skillSearch) && (
+                {(filterStatus !== 'all' || atsThreshold !== DEFAULT_ATS_THRESHOLD || skillFilters.length > 0) && (
                   <button
                     onClick={handleResetFilters}
                     className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
@@ -347,26 +368,55 @@ export const HireSmart: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 justify-between">
-              <div className="relative flex-1 min-w-[220px] max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by skills (e.g., React, Python, Java)..."
-                  value={skillSearch}
-                  onChange={e => setSkillSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-                {skillSearch && (
-                  <button
-                    onClick={() => setSkillSearch('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              <div className="flex-1 min-w-[220px] max-w-md">
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Add skill to filter (e.g., React, Python)..."
+                      value={skillInput}
+                      onChange={e => setSkillInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSkillFilter();
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleAddSkillFilter}
+                    variant="primary"
+                    className="px-4"
                   >
-                    ✕
-                  </button>
+                    Add
+                  </Button>
+                </div>
+                {skillFilters.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {skillFilters.map((skill, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium border border-indigo-200"
+                      >
+                        <span>{skill}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSkillFilter(skill)}
+                          className="hover:text-indigo-900 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                Results are ordered by highest ATS score.
+                Candidates must have ALL selected skills.
               </p>
             </div>
           </div>
@@ -430,7 +480,9 @@ export const HireSmart: React.FC = () => {
                     <p className="text-sm font-medium text-gray-700 mb-2">Skills:</p>
                     <div className="flex flex-wrap gap-2">
                       {candidate.skills.map((skill, idx) => {
-                        const isMatch = normalizedSkillSearch.length > 0 && skill.toLowerCase().includes(normalizedSkillSearch);
+                        const isMatch = skillFilters.length > 0 && skillFilters.some(filter => 
+                          skill.toLowerCase().includes(filter.toLowerCase())
+                        );
                         return (
                           <span
                             key={idx}
@@ -567,7 +619,9 @@ export const HireSmart: React.FC = () => {
                     <p className="text-sm font-medium text-gray-500 mb-2">Skills</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedCandidate.skills.map((skill, idx) => {
-                        const isMatch = normalizedSkillSearch.length > 0 && skill.toLowerCase().includes(normalizedSkillSearch);
+                        const isMatch = skillFilters.length > 0 && skillFilters.some(filter =>
+                          skill.toLowerCase().includes(filter.toLowerCase())
+                        );
                         return (
                           <span
                             key={idx}
