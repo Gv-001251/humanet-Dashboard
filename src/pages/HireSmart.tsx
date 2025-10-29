@@ -303,7 +303,7 @@ export const HireSmart: React.FC = () => {
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx"
+            accept=".pdf,.docx,.csv"
             onChange={handleFileUpload}
             className="hidden"
           />

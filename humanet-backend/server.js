@@ -1104,6 +1104,7 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
 
     for (const file of files) {
       let extractedText = '';
+      let csvCandidatesCreated = 0;
 
       if (file.mimetype === 'application/pdf') {
         const buffer = fs.readFileSync(file.path);
@@ -1112,31 +1113,129 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         const result = await mammoth.extractRawText({ path: file.path });
         extractedText = result.value;
+      } else if (file.mimetype === 'text/csv' || file.originalname.toLowerCase().endsWith('.csv')) {
+        const csvContent = fs.readFileSync(file.path, 'utf-8');
+        const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
+
+        if (lines.length > 0) {
+          const parseCSVLine = (line) => {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                  current += '"';
+                  i++;
+                } else {
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === ',' && !inQuotes) {
+                values.push(current);
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            values.push(current);
+            return values;
+          };
+
+          const headers = parseCSVLine(lines[0]).map(h => (h ?? '').trim().toLowerCase());
+
+          for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            const row = {};
+            headers.forEach((header, index) => {
+              if (!header) {
+                return;
+              }
+              const rawValue = values[index] ?? '';
+              const cleanedValue = rawValue.replace(/^"|"$/g, '').trim();
+              if (cleanedValue) {
+                row[header] = cleanedValue;
+              }
+            });
+
+            const getRowValue = (...keys) => {
+              for (const key of keys) {
+                if (key && row[key]) {
+                  return row[key];
+                }
+              }
+              return '';
+            };
+
+            const nameValue = getRowValue('name', 'full name', 'full_name', 'candidate name');
+            const emailValue = getRowValue('email', 'email address', 'mail');
+            const phoneValue = getRowValue('phone', 'phone number', 'mobile', 'contact');
+            const skillsField = getRowValue('skills', 'skillset', 'key skills', 'skills set');
+            const experienceValue = getRowValue('experience', 'experience_years', 'years of experience', 'experience (years)');
+            const ctcValue = getRowValue('ctc', 'expected ctc', 'current ctc', 'salary');
+            const locationValue = getRowValue('location', 'city', 'base location');
+            const domainValue = getRowValue('domain', 'role', 'position', 'job title');
+            const atsValue = getRowValue('ats score', 'atsscore', 'ats_score', 'score');
+            const educationValue = getRowValue('education', 'qualification', 'degree');
+
+            const skillsArray = skillsField
+              ? Array.from(new Set(skillsField.split(/[,;|]/).map(skill => skill.trim()).filter(Boolean)))
+              : [];
+
+            const experienceNumber = parseFloat(experienceValue);
+            const ctcNumber = parseFloat(ctcValue);
+            const atsNumber = parseFloat(atsValue);
+
+            const candidate = {
+              id: `cand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: nameValue || `CSV Candidate ${csvCandidatesCreated + 1}`,
+              email: emailValue || `candidate${Date.now()}@example.com`,
+              phone: phoneValue || '+91 9876543210',
+              skills: skillsArray,
+              experience: Number.isFinite(experienceNumber) ? Math.max(0, Math.round(experienceNumber)) : Math.floor(Math.random() * 8) + 2,
+              ctc: Number.isFinite(ctcNumber) ? Math.max(0, Math.round(ctcNumber)) : Math.floor(Math.random() * 1000000) + 500000,
+              location: locationValue || ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
+              domain: domainValue || ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
+              atsScore: Number.isFinite(atsNumber) ? Math.max(0, Math.min(100, Math.round(atsNumber))) : Math.floor(Math.random() * 40) + 60,
+              status: 'pending',
+              education: educationValue || 'B.Tech Computer Science',
+              resumeUrl: `/uploads/${file.filename}`,
+              createdAt: new Date()
+            };
+
+            candidates.push(candidate);
+            parsedCandidates.push(candidate);
+            csvCandidatesCreated++;
+          }
+        }
       }
 
-      const emailMatch = extractedText.match(/[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}/);
-      const phoneMatch = extractedText.match(/[+]?\d[\d\s-]{8,}/);
-      const skillsMatch = extractedText.match(/(React|Node\.js|Python|Java|AWS|MongoDB|TypeScript|JavaScript|Docker|CI\/CD|AI|ML)/gi) || [];
+      if (csvCandidatesCreated === 0) {
+        const emailMatch = extractedText.match(/[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}/);
+        const phoneMatch = extractedText.match(/[+]?\d[\d\s-]{8,}/);
+        const skillsMatch = extractedText.match(/(React|Node\.js|Python|Java|AWS|MongoDB|TypeScript|JavaScript|Docker|CI\/CD|AI|ML)/gi) || [];
 
-      const candidate = {
-        id: `cand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: file.originalname.replace(/\.(pdf|docx)$/i, '').replace(/[-_]/g, ' '),
-        email: emailMatch ? emailMatch[0] : `candidate${Date.now()}@example.com`,
-        phone: phoneMatch ? phoneMatch[0] : '+91 9876543210',
-        skills: [...new Set(skillsMatch.map(skill => skill.charAt(0).toUpperCase() + skill.slice(1).toLowerCase()))],
-        experience: Math.floor(Math.random() * 8) + 2,
-        ctc: Math.floor(Math.random() * 1000000) + 500000,
-        location: ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
-        domain: ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
-        atsScore: Math.floor(Math.random() * 40) + 60,
-        status: 'pending',
-        education: 'B.Tech Computer Science',
-        resumeUrl: `/uploads/${file.filename}`,
-        createdAt: new Date()
-      };
+        const candidate = {
+          id: `cand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.originalname.replace(/\.(pdf|docx|csv)$/i, '').replace(/[-_]/g, ' '),
+          email: emailMatch ? emailMatch[0] : `candidate${Date.now()}@example.com`,
+          phone: phoneMatch ? phoneMatch[0] : '+91 9876543210',
+          skills: [...new Set(skillsMatch.map(skill => skill.charAt(0).toUpperCase() + skill.slice(1).toLowerCase()))],
+          experience: Math.floor(Math.random() * 8) + 2,
+          ctc: Math.floor(Math.random() * 1000000) + 500000,
+          location: ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai'][Math.floor(Math.random() * 4)],
+          domain: ['Frontend', 'Backend', 'Full Stack', 'Data Science'][Math.floor(Math.random() * 4)],
+          atsScore: Math.floor(Math.random() * 40) + 60,
+          status: 'pending',
+          education: 'B.Tech Computer Science',
+          resumeUrl: `/uploads/${file.filename}`,
+          createdAt: new Date()
+        };
 
-      candidates.push(candidate);
-      parsedCandidates.push(candidate);
+        candidates.push(candidate);
+        parsedCandidates.push(candidate);
+      }
     }
 
     res.json({ success: true, data: parsedCandidates });
