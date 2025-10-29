@@ -19,11 +19,34 @@ import {
   Mail,
   Phone,
   TrendingUp,
-  Info
+  Info,
+  IndianRupee
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { talentScoutService } from '../services/talentScoutService';
-import { ExternalCandidate, SearchFilters } from '../types/talentScout.types';
+import { SalaryFilterSection } from '../components/talent-scout/SalaryFilterSection';
+import { ExternalCandidate, SearchFilters, SalarySummary } from '../types/talentScout.types';
+
+const INDUSTRY_OPTIONS = [
+  { label: 'IT / Technology', value: 'IT/Tech' },
+  { label: 'Finance & Banking', value: 'Finance' },
+  { label: 'Healthcare & Pharma', value: 'Healthcare' },
+  { label: 'Manufacturing', value: 'Manufacturing' },
+  { label: 'E-Commerce & Retail', value: 'E-Commerce' },
+  { label: 'Consulting & Services', value: 'Consulting' },
+  { label: 'Education / EdTech', value: 'EdTech' },
+  { label: 'Telecom & Networking', value: 'Telecom' },
+  { label: 'Automotive', value: 'Automotive' },
+  { label: 'Media & Entertainment', value: 'Media' }
+];
+
+const COMPANY_SIZE_OPTIONS = [
+  { label: 'Startup (1 - 50 employees)', value: 'Startup' },
+  { label: 'Scale-up (51 - 500)', value: 'SME' },
+  { label: 'Mid-Size (501 - 2000)', value: 'Mid-Size' },
+  { label: 'Large (2000 - 10000)', value: 'Large' },
+  { label: 'MNC / Enterprise (10000+)', value: 'MNC' }
+];
 
 export const TalentScout: React.FC = () => {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
@@ -31,12 +54,17 @@ export const TalentScout: React.FC = () => {
     keywords: '',
     location: '',
     experience: { min: 0, max: 15 },
-    skills: []
+    skills: [],
+    salaryBudget: null,
+    jobTitle: '',
+    industry: 'IT/Tech',
+    companySize: 'SME'
   });
   
   const [skillInput, setSkillInput] = useState('');
   const [candidates, setCandidates] = useState<ExternalCandidate[]>([]);
   const [savedCandidates, setSavedCandidates] = useState<ExternalCandidate[]>([]);
+  const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<ExternalCandidate | null>(null);
   const [inviteMessage, setInviteMessage] = useState('');
@@ -46,6 +74,7 @@ export const TalentScout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
   const [lastSearchFilters, setLastSearchFilters] = useState<SearchFilters | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [enableSalaryFilter, setEnableSalaryFilter] = useState(false);
 
   useEffect(() => {
     loadSavedCandidates();
@@ -74,11 +103,13 @@ export const TalentScout: React.FC = () => {
       skills: [...searchFilters.skills]
     };
 
+    setSalarySummary(null);
     setIsSearching(true);
     try {
       const response = await talentScoutService.search({ ...filtersSnapshot, resultsPerPlatform: 20 });
       if (response.success) {
         setCandidates(response.data);
+        setSalarySummary(response.salarySummary || null);
         setLastSearchFilters(filtersSnapshot);
       }
     } catch (error) {
@@ -96,7 +127,10 @@ export const TalentScout: React.FC = () => {
     try {
       const response = await talentScoutService.search({ ...lastSearchFilters, resultsPerPlatform: 10 });
       if (response.success) {
-        setCandidates(prev => [...prev, ...response.data]);
+        setCandidates(prev => mergeCandidates(prev, response.data));
+        if (response.salarySummary) {
+          setSalarySummary(response.salarySummary);
+        }
       }
     } catch (error) {
       console.error('Error loading more candidates:', error);
@@ -241,6 +275,40 @@ export const TalentScout: React.FC = () => {
     return `₹${(amount / 100000).toFixed(1)}L`;
   };
 
+  const getSalaryFitStyles = (status?: ExternalCandidate['salaryFitStatus']) => {
+    switch (status) {
+      case 'perfect-match':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'below-budget':
+        return 'bg-green-50 text-green-700 border-green-200';
+      case 'negotiable':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'stretch':
+        return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'above-budget':
+        return 'bg-red-50 text-red-600 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getSalaryFitLabel = (status?: ExternalCandidate['salaryFitStatus']) => {
+    switch (status) {
+      case 'perfect-match':
+        return 'Within Budget';
+      case 'below-budget':
+        return 'Below Budget';
+      case 'negotiable':
+        return 'Negotiable Fit';
+      case 'stretch':
+        return 'Stretch Fit';
+      case 'above-budget':
+        return 'Above Budget';
+      default:
+        return 'Salary Insight';
+    }
+  };
+
   const renderCandidateCard = (candidate: ExternalCandidate) => {
     const canOpenExternal = Boolean(candidate.profileUrl) && candidate.externalViewAvailable !== false;
     const ViewIcon = canOpenExternal ? ExternalLink : Eye;
@@ -347,6 +415,38 @@ export const TalentScout: React.FC = () => {
             </div>
           </div>
 
+          {/* Salary Fit Section */}
+          {candidate.salaryInsights && candidate.salaryInsights.salaryFit && (
+            <div className={`mb-4 p-3 rounded-lg border ${getSalaryFitStyles(candidate.salaryFitStatus)}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center space-x-1.5">
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase">{getSalaryFitLabel(candidate.salaryFitStatus)}</span>
+                </div>
+                <span className="text-xs font-bold">{candidate.salaryFitPercentage}%</span>
+              </div>
+              <p className="text-xs leading-relaxed">
+                {candidate.salaryInsights.salaryFit.message}
+              </p>
+              {candidate.salaryInsights.formatted && (
+                <div className="mt-2 pt-2 border-t border-current/10 text-[10px] space-y-0.5">
+                  <div className="flex justify-between">
+                    <span>Expected:</span>
+                    <span className="font-semibold">{candidate.salaryInsights.formatted.expectedCtc}</span>
+                  </div>
+                  {candidate.salaryInsights.formatted.budgetMax && (
+                    <div className="flex justify-between">
+                      <span>Budget Range:</span>
+                      <span className="font-semibold">
+                        {candidate.salaryInsights.formatted.budgetMin} - {candidate.salaryInsights.formatted.budgetMax}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex items-center space-x-2 pt-3 border-t border-gray-100">
             <button
@@ -439,7 +539,7 @@ export const TalentScout: React.FC = () => {
                 <h2 className="text-lg font-bold text-gray-900">Search Filters</h2>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Platform
@@ -573,6 +673,13 @@ export const TalentScout: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              <SalaryFilterSection
+                searchFilters={searchFilters}
+                setSearchFilters={setSearchFilters}
+                enableSalaryFilter={enableSalaryFilter}
+                setEnableSalaryFilter={setEnableSalaryFilter}
+              />
 
               <Button
                 type="submit"
