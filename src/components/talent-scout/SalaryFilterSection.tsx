@@ -52,7 +52,7 @@ export const SalaryFilterSection: React.FC<SalaryFilterSectionProps> = ({
       </div>
 
       <p className="text-xs text-gray-600 mb-3">
-        Provide the salary range for this role. We will align candidate experience levels to this compensation band.
+        Provide the allocated salary range for this role. We will determine the appropriate experience level based on this budget and show matching candidate profiles.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -2262,33 +2262,6 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
     let filteredResults = results.filter(candidate => 
       AVAILABLE_AVAILABILITY_STATUSES.has(candidate.availability)
     );
-    
-    if (parsedBudget) {
-      filteredResults = filteredResults.filter(candidate => {
-        const expectedSalary = typeof candidate.expectedCtc === 'number' ? candidate.expectedCtc : null;
-        if (expectedSalary === null) {
-          return false;
-        }
-        
-        const salaryFit = candidate.salaryInsights ? candidate.salaryInsights.salaryFit : null;
-        
-        if (!salaryFit) {
-          return expectedSalary >= parsedBudget.min && expectedSalary <= parsedBudget.max;
-        }
-        
-        const { status } = salaryFit;
-        
-        if (status === 'perfect-match' || status === 'below-budget') {
-          return true;
-        }
-        
-        if (parsedBudget.includeNegotiable && (status === 'negotiable' || status === 'stretch')) {
-          return expectedSalary <= parsedBudget.max * 1.1;
-        }
-        
-        return expectedSalary >= parsedBudget.min && expectedSalary <= parsedBudget.max;
-      });
-    }
 
     if (derivedExperienceRange && Array.isArray(derivedExperienceRange.probabilities)) {
       filteredResults = filteredResults.map(candidate => {
