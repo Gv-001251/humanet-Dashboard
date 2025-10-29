@@ -1,0 +1,5 @@
+Test Resume for John Doe
+Email: john.doe@example.com
+Phone: +91 9876543210
+Skills: React, Node.js, TypeScript, MongoDB
+Experience: 5 years
