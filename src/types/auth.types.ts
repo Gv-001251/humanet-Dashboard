@@ -4,7 +4,8 @@ export interface LoginCredentials {
 }
 
 export interface User {
-  id: string;
+  userId: string;
+  id?: string;
   email: string;
   name: string;
   role: 'hr' | 'admin' | 'team_lead' | 'ceo' | 'investor' | 'employee';
@@ -12,6 +13,7 @@ export interface User {
 
 export interface LoginResponse {
   success: boolean;
-  token: string;
+  token?: string;
   user: User;
+  message?: string;
 }

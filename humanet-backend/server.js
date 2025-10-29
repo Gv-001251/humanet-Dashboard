@@ -1,5 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +19,22 @@ const {
   formatSalary,
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
+
+const authRoutes = require('./src/routes/authRoutes');
+const { authenticateToken } = require('./src/security/authMiddleware');
+const { initializeSessionCollections, cleanupExpiredSessions } = require('./src/security/sessionManager');
+const {
+  initializeUsersCollection,
+  seedDefaultUsers,
+  findUserById,
+  listUsers,
+  createUser,
+  updateUserProfile,
+  deleteUser,
+  updateUserPassword,
+  verifyUserPassword
+} = require('./src/security/userService');
+const { apiLimiter } = require('./src/security/rateLimiter');
 
 // Configure allowed MIME types
 const ALLOWED_MIME_TYPES = {
@@ -35,9 +56,45 @@ ensureUploadsDirExists();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie']
+}));
+
+app.use(cookieParser(process.env.COOKIE_SECRET || 'humanet-cookie-secret'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use(mongoSanitize());
+app.use(xss());
+app.use(hpp());
+
 app.use('/uploads', express.static(uploadsDir));
+
+app.use(apiLimiter);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -50,14 +107,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-let users = [
-  { id: 'user1', email: 'hr@humanet.com', password: 'hr123', name: 'Gayathri G', role: 'hr' },
-  { id: 'user2', email: 'admin@humanet.com', password: 'admin123', name: 'Alex Doe', role: 'admin' },
-  { id: 'user3', email: 'lead@humanet.com', password: 'lead123', name: 'Priya Singh', role: 'team_lead' },
-  { id: 'user4', email: 'ceo@humanet.com', password: 'ceo123', name: 'Vikram Rao', role: 'ceo' },
-  { id: 'user5', email: 'investor@humanet.com', password: 'investor123', name: 'Nisha Patel', role: 'investor' }
-];
 
 let candidates = [
   {
@@ -172,7 +221,26 @@ const initializeDatabase = async () => {
   }
 };
 
+const initializeSecurityInfrastructure = async () => {
+  try {
+    await initializeUsersCollection();
+    await seedDefaultUsers();
+    await initializeSessionCollections();
+
+    setInterval(() => {
+      cleanupExpiredSessions().catch((error) => {
+        console.error('Security cleanup error:', error);
+      });
+    }, 60 * 60 * 1000);
+
+    console.log('Security infrastructure initialized successfully.');
+  } catch (error) {
+    console.error('Failed to initialize security infrastructure:', error);
+  }
+};
+
 initializeDatabase();
+initializeSecurityInfrastructure();
 
 let employees = [
   {
@@ -1136,47 +1204,9 @@ const deleteResumeFile = resumeUrl => {
   }
 };
 
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ success: false, message: 'Missing authorization header' });
-  }
+app.use('/api/auth', authRoutes);
 
-  const token = authHeader.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-
-  const user = users.find(u => token.includes(u.id));
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-
-  req.user = { id: user.id, role: user.role, name: user.name, email: user.email };
-  next();
-};
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
-
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid credentials' });
-  }
-
-  const { password: _password, ...userWithoutPassword } = user;
-  res.json({
-    success: true,
-    token: `token-${user.id}-${Date.now()}`,
-    user: userWithoutPassword
-  });
-});
-
-app.post('/api/auth/logout', authenticate, (req, res) => {
-  res.json({ success: true, message: 'Logged out successfully' });
-});
-
-app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), async (req, res) => {
+app.post('/api/candidates/upload', authenticateToken, upload.array('resumes', 10), async (req, res) => {
   try {
     const files = req.files || [];
     const parsedCandidates = [];
@@ -1349,7 +1379,7 @@ app.post('/api/candidates/upload', authenticate, upload.array('resumes', 10), as
   }
 });
 
-app.get('/api/candidates', authenticate, async (req, res) => {
+app.get('/api/candidates', authenticateToken, async (req, res) => {
   try {
     await refreshCandidatesFromDB();
     res.json({ success: true, data: candidates });
@@ -1359,7 +1389,7 @@ app.get('/api/candidates', authenticate, async (req, res) => {
   }
 });
 
-app.get('/api/candidates/:id', authenticate, async (req, res) => {
+app.get('/api/candidates/:id', authenticateToken, async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1389,7 +1419,7 @@ app.get('/api/candidates/:id', authenticate, async (req, res) => {
   }
 });
 
-app.put('/api/candidates/:id/status', authenticate, async (req, res) => {
+app.put('/api/candidates/:id/status', authenticateToken, async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1443,7 +1473,7 @@ app.put('/api/candidates/:id/status', authenticate, async (req, res) => {
   }
 });
 
-app.delete('/api/candidates/:id', authenticate, async (req, res) => {
+app.delete('/api/candidates/:id', authenticateToken, async (req, res) => {
   const candidateId = req.params.id;
 
   try {
@@ -1483,7 +1513,7 @@ app.delete('/api/candidates/:id', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/projects', authenticate, (req, res) => {
+app.post('/api/projects', authenticateToken, (req, res) => {
   const project = {
     id: `proj-${Date.now()}`,
     ...req.body,
@@ -1495,11 +1525,11 @@ app.post('/api/projects', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.get('/api/projects', authenticate, (req, res) => {
+app.get('/api/projects', authenticateToken, (req, res) => {
   res.json({ success: true, data: projects });
 });
 
-app.get('/api/projects/:id', authenticate, (req, res) => {
+app.get('/api/projects/:id', authenticateToken, (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1507,7 +1537,7 @@ app.get('/api/projects/:id', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.post('/api/projects/:id/match', authenticate, (req, res) => {
+app.post('/api/projects/:id/match', authenticateToken, (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1533,7 +1563,7 @@ app.post('/api/projects/:id/match', authenticate, (req, res) => {
   res.json({ success: true, data: matches.slice(0, project.teamSize || 3) });
 });
 
-app.post('/api/projects/:id/assign', authenticate, (req, res) => {
+app.post('/api/projects/:id/assign', authenticateToken, (req, res) => {
   const { employeeIds } = req.body;
   const project = projects.find(p => p.id === req.params.id);
 
@@ -1560,7 +1590,7 @@ app.post('/api/projects/:id/assign', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.put('/api/projects/:id/progress', authenticate, (req, res) => {
+app.put('/api/projects/:id/progress', authenticateToken, (req, res) => {
   const project = projects.find(p => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1570,7 +1600,7 @@ app.put('/api/projects/:id/progress', authenticate, (req, res) => {
   res.json({ success: true, data: project });
 });
 
-app.post('/api/salary/predict', authenticate, (req, res) => {
+app.post('/api/salary/predict', authenticateToken, (req, res) => {
   const { role, skills = '', experience = 0, location = 'Bangalore', industry = 'IT', companySize = 'Medium', education = 'Bachelor' } = req.body;
 
   const expYears = parseInt(experience, 10) || 0;
@@ -1604,7 +1634,7 @@ app.post('/api/salary/predict', authenticate, (req, res) => {
   });
 });
 
-app.post('/api/salary/save', authenticate, (req, res) => {
+app.post('/api/salary/save', authenticateToken, (req, res) => {
   const prediction = {
     id: `pred-${Date.now()}`,
     ...req.body,
@@ -1614,11 +1644,11 @@ app.post('/api/salary/save', authenticate, (req, res) => {
   res.json({ success: true, data: prediction });
 });
 
-app.get('/api/salary/history', authenticate, (req, res) => {
+app.get('/api/salary/history', authenticateToken, (req, res) => {
   res.json({ success: true, data: salaryPredictions });
 });
 
-app.delete('/api/salary/:id', authenticate, (req, res) => {
+app.delete('/api/salary/:id', authenticateToken, (req, res) => {
   const index = salaryPredictions.findIndex(p => p.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, message: 'Prediction not found' });
@@ -1627,7 +1657,7 @@ app.delete('/api/salary/:id', authenticate, (req, res) => {
   res.json({ success: true, message: 'Prediction removed' });
 });
 
-app.get('/api/analytics/overview', authenticate, (req, res) => {
+app.get('/api/analytics/overview', authenticateToken, (req, res) => {
   const now = new Date();
   const activeProjectsCount = projects.filter(project => project.progress > 0 && project.progress < 100).length;
 
@@ -1646,7 +1676,7 @@ app.get('/api/analytics/overview', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/hiring-funnel', authenticate, (req, res) => {
+app.get('/api/analytics/hiring-funnel', authenticateToken, (req, res) => {
   const total = candidates.length;
   res.json({
     success: true,
@@ -1660,7 +1690,7 @@ app.get('/api/analytics/hiring-funnel', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/projects', authenticate, (req, res) => {
+app.get('/api/analytics/projects', authenticateToken, (req, res) => {
   res.json({
     success: true,
     data: projects.map(project => ({
@@ -1673,7 +1703,7 @@ app.get('/api/analytics/projects', authenticate, (req, res) => {
   });
 });
 
-app.get('/api/analytics/employees', authenticate, (req, res) => {
+app.get('/api/analytics/employees', authenticateToken, (req, res) => {
   const departmentCounts = employees.reduce((acc, emp) => {
     acc[emp.department] = (acc[emp.department] || 0) + 1;
     return acc;
@@ -1682,7 +1712,7 @@ app.get('/api/analytics/employees', authenticate, (req, res) => {
   res.json({ success: true, data: departmentCounts });
 });
 
-app.get('/api/analytics/activities', authenticate, (req, res) => {
+app.get('/api/analytics/activities', authenticateToken, (req, res) => {
   const recentActivities = [];
   
   const now = new Date();
@@ -1751,7 +1781,7 @@ app.get('/api/analytics/activities', authenticate, (req, res) => {
   res.json({ success: true, data: recentActivities.slice(0, 5) });
 });
 
-app.get('/api/analytics/salary-expenses', authenticate, (req, res) => {
+app.get('/api/analytics/salary-expenses', authenticateToken, (req, res) => {
   const avgSalaryPerEmployee = 520000;
   const totalEmployees = employees.length;
   const now = new Date();
@@ -1776,7 +1806,7 @@ app.get('/api/analytics/salary-expenses', authenticate, (req, res) => {
   res.json({ success: true, data: salaryData });
 });
 
-app.post('/api/messages/send-email', authenticate, (req, res) => {
+app.post('/api/messages/send-email', authenticateToken, (req, res) => {
   const { recipient, subject } = req.body;
 
   notifications.unshift({
@@ -1790,11 +1820,11 @@ app.post('/api/messages/send-email', authenticate, (req, res) => {
   res.json({ success: true, message: 'Email sent successfully' });
 });
 
-app.get('/api/messages/notifications', authenticate, (req, res) => {
+app.get('/api/messages/notifications', authenticateToken, (req, res) => {
   res.json({ success: true, data: notifications });
 });
 
-app.put('/api/messages/:id/read', authenticate, (req, res) => {
+app.put('/api/messages/:id/read', authenticateToken, (req, res) => {
   const notification = notifications.find(n => n.id === req.params.id);
   if (notification) {
     notification.read = true;
@@ -1802,84 +1832,114 @@ app.put('/api/messages/:id/read', authenticate, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/settings/profile', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.get('/api/settings/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, data: user });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve profile' });
   }
-  const { password, ...userWithoutPassword } = user;
-  res.json({ success: true, data: userWithoutPassword });
 });
 
-app.put('/api/settings/profile', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.put('/api/settings/profile', authenticateToken, async (req, res) => {
+  try {
+    const updates = {
+      name: req.body.name
+    };
+    const updatedUser = await updateUserProfile(req.user.userId, updates);
+    res.json({ success: true, data: updatedUser });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile' });
   }
-  user.name = req.body.name || user.name;
-  res.json({ success: true, data: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
-app.put('/api/settings/password', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.get('/api/settings/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await listUsers();
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('List users error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve users' });
   }
-  user.password = req.body.password;
-  res.json({ success: true, message: 'Password updated successfully' });
 });
 
-app.get('/api/settings/users', authenticate, (req, res) => {
-  res.json({
-    success: true,
-    data: users.map(({ password, ...user }) => user)
-  });
-});
+app.post('/api/settings/users', authenticateToken, async (req, res) => {
+  try {
+    const { name, email, role, password } = req.body;
 
-app.post('/api/settings/users', authenticate, (req, res) => {
-  const newUser = {
-    id: `user-${Date.now()}`,
-    name: req.body.name,
-    email: req.body.email,
-    role: req.body.role,
-    password: req.body.password || 'password123'
-  };
-  users.push(newUser);
-  const { password, ...userWithoutPassword } = newUser;
-  res.json({ success: true, data: userWithoutPassword });
-});
+    if (!name || !email || !role || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, role, and password are required'
+      });
+    }
 
-app.put('/api/settings/users/:id', authenticate, (req, res) => {
-  const user = users.find(u => u.id === req.params.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+    const newUser = await createUser({
+      email,
+      name,
+      role,
+      password
+    });
+
+    res.json({ success: true, data: newUser });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to create user'
+    });
   }
-  Object.assign(user, req.body);
-  const { password, ...userWithoutPassword } = user;
-  res.json({ success: true, data: userWithoutPassword });
 });
 
-app.delete('/api/settings/users/:id', authenticate, (req, res) => {
-  const index = users.findIndex(u => u.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+app.put('/api/settings/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const updates = {
+      name: req.body.name,
+      role: req.body.role,
+      email: req.body.email
+    };
+
+    const updatedUser = await updateUserProfile(req.params.id, updates);
+    res.json({ success: true, data: updatedUser });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to update user'
+    });
   }
-  users.splice(index, 1);
-  res.json({ success: true, message: 'User removed' });
 });
 
-app.get('/api/settings/company', authenticate, (req, res) => {
+app.delete('/api/settings/users/:id', authenticateToken, async (req, res) => {
+  try {
+    await deleteUser(req.params.id);
+    res.json({ success: true, message: 'User removed' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to delete user'
+    });
+  }
+});
+
+app.get('/api/settings/company', authenticateToken, (req, res) => {
   res.json({ success: true, data: companySettings });
 });
 
-app.put('/api/settings/company', authenticate, (req, res) => {
+app.put('/api/settings/company', authenticateToken, (req, res) => {
   companySettings.name = req.body.name || companySettings.name;
   companySettings.logoUrl = req.body.logoUrl || companySettings.logoUrl;
   companySettings.locations = req.body.locations || companySettings.locations;
   res.json({ success: true, data: companySettings });
 });
 
-app.get('/api/settings/ats', authenticate, (req, res) => {
+app.get('/api/settings/ats', authenticateToken, (req, res) => {
   res.json({
     success: true,
     data: {
@@ -1889,7 +1949,7 @@ app.get('/api/settings/ats', authenticate, (req, res) => {
   });
 });
 
-app.put('/api/settings/ats', authenticate, (req, res) => {
+app.put('/api/settings/ats', authenticateToken, (req, res) => {
   if (typeof req.body.atsThreshold === 'number') {
     companySettings.atsThreshold = req.body.atsThreshold;
   }
@@ -2164,7 +2224,7 @@ const generateMockNaukriCandidates = (filters, count = 5) => {
   return results;
 };
 
-app.post('/api/talent-scout/search', authenticate, (req, res) => {
+app.post('/api/talent-scout/search', authenticateToken, (req, res) => {
   try {
     const {
       platform,
@@ -2361,7 +2421,7 @@ app.post('/api/talent-scout/search', authenticate, (req, res) => {
   }
 });
 
-app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
+app.get('/api/talent-scout/candidates', authenticateToken, (req, res) => {
   const invitedCandidates = externalCandidates.filter(c => 
     (c.status === 'invited' || c.status === 'applied') && 
     AVAILABLE_AVAILABILITY_STATUSES.has(c.availability)
@@ -2369,7 +2429,7 @@ app.get('/api/talent-scout/candidates', authenticate, (req, res) => {
   res.json({ success: true, data: invitedCandidates });
 });
 
-app.post('/api/talent-scout/invite', authenticate, (req, res) => {
+app.post('/api/talent-scout/invite', authenticateToken, (req, res) => {
   try {
     const { candidateId, jobId, message } = req.body;
     
@@ -2407,7 +2467,7 @@ app.post('/api/talent-scout/invite', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/predict', authenticate, (req, res) => {
+app.post('/api/salary/predict', authenticateToken, (req, res) => {
   try {
     const { experience, role, location, industry, skills, companySize } = req.body;
 
@@ -2440,7 +2500,7 @@ app.post('/api/salary/predict', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/market-comparison', authenticate, (req, res) => {
+app.post('/api/salary/market-comparison', authenticateToken, (req, res) => {
   try {
     const { experience, role, location, industry, skills, companySize } = req.body;
 
@@ -2473,7 +2533,7 @@ app.post('/api/salary/market-comparison', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/salary/check-fit', authenticate, (req, res) => {
+app.post('/api/salary/check-fit', authenticateToken, (req, res) => {
   try {
     const { expectedSalary, budgetRange } = req.body;
 
