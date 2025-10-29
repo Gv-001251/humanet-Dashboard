@@ -19,11 +19,14 @@ import {
   Mail,
   Phone,
   TrendingUp,
-  Info
+  Info,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { talentScoutService } from '../services/talentScoutService';
-import { ExternalCandidate, SearchFilters } from '../types/talentScout.types';
+import { ExternalCandidate, SearchFilters, LinkedInIntegrationStatus, SearchResponse } from '../types/talentScout.types';
+
+type SearchMeta = NonNullable<SearchResponse['meta']>;
 
 export const TalentScout: React.FC = () => {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
@@ -44,10 +47,24 @@ export const TalentScout: React.FC = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
+  const [linkedInStatus, setLinkedInStatus] = useState<LinkedInIntegrationStatus | null>(null);
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
 
   useEffect(() => {
     loadSavedCandidates();
+    loadLinkedInStatus();
   }, []);
+
+  const loadLinkedInStatus = async () => {
+    try {
+      const response = await talentScoutService.getLinkedInStatus();
+      if (response.success) {
+        setLinkedInStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading LinkedIn status:', error);
+    }
+  };
 
   const loadSavedCandidates = async () => {
     try {
@@ -72,15 +89,25 @@ export const TalentScout: React.FC = () => {
       skills: [...searchFilters.skills]
     };
 
+    setSearchMeta(null);
     setIsSearching(true);
     try {
       const response = await talentScoutService.search(filtersSnapshot);
       if (response.success) {
         setCandidates(response.data);
+        if (response.meta) {
+          setSearchMeta(response.meta);
+          if (response.meta.linkedinIntegration) {
+            setLinkedInStatus(response.meta.linkedinIntegration);
+          }
+        } else {
+          setSearchMeta(null);
+        }
       }
     } catch (error) {
       console.error('Error searching candidates:', error);
       alert('Failed to search candidates. Please try again.');
+      setSearchMeta(null);
     } finally {
       setIsSearching(false);
     }
@@ -372,10 +399,58 @@ export const TalentScout: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Talent Scout</h1>
               <p className="text-gray-600">
-                Discover and connect with top talent from LinkedIn & Naukri
+                Discover and connect with top talent from LinkedIn & Naukri using HR-provided keywords
               </p>
             </div>
           </div>
+
+          {/* LinkedIn Integration Status */}
+          {linkedInStatus && (
+            <div className={`mt-4 rounded-lg border p-4 ${
+              linkedInStatus.mode === 'production' 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <div className={`p-2 rounded-lg ${
+                  linkedInStatus.mode === 'production'
+                    ? 'bg-green-100'
+                    : 'bg-blue-100'
+                }`}>
+                  <Linkedin className={`w-5 h-5 ${
+                    linkedInStatus.mode === 'production'
+                      ? 'text-green-600'
+                      : 'text-blue-600'
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-semibold ${
+                    linkedInStatus.mode === 'production'
+                      ? 'text-green-900'
+                      : 'text-blue-900'
+                  }`}>
+                    {linkedInStatus.mode === 'production' 
+                      ? '✓ LinkedIn Integration Active' 
+                      : 'LinkedIn Integration (Demo Mode)'}
+                  </h3>
+                  <p className={`text-sm mt-1 ${
+                    linkedInStatus.mode === 'production'
+                      ? 'text-green-700'
+                      : 'text-blue-700'
+                  }`}>
+                    {linkedInStatus.mode === 'production'
+                      ? 'Connected to LinkedIn API. Search results include live LinkedIn profiles based on your keywords.'
+                      : 'Currently running with sample LinkedIn profiles. Configure LINKEDIN_API_KEY in environment settings to enable live searches.'}
+                  </p>
+                </div>
+                <LinkIcon className={`w-4 h-4 ${
+                  linkedInStatus.mode === 'production'
+                    ? 'text-green-600'
+                    : 'text-blue-600'
+                }`} />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -423,7 +498,7 @@ export const TalentScout: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Keywords *
+                    Search Keywords *
                   </label>
                   <input
                     type="text"
@@ -434,6 +509,10 @@ export const TalentScout: React.FC = () => {
                     placeholder="e.g., Software Engineer, React Developer"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    <Info className="w-3 h-3 inline mr-1" />
+                    Enter job titles, roles, or skills to search LinkedIn profiles
+                  </p>
                 </div>
 
                 <div>
@@ -450,6 +529,61 @@ export const TalentScout: React.FC = () => {
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Platform
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSearchFilters(prev => ({ ...prev, platform: 'both' }))}
+                    className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                      searchFilters.platform === 'both'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-lg'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <Linkedin className="w-4 h-4" />
+                      <Globe className="w-4 h-4" />
+                      <span className="text-sm">Both</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchFilters(prev => ({ ...prev, platform: 'linkedin' }))}
+                    className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                      searchFilters.platform === 'linkedin'
+                        ? 'bg-blue-600 text-white border-transparent shadow-lg'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <Linkedin className="w-4 h-4" />
+                      <span className="text-sm">LinkedIn</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchFilters(prev => ({ ...prev, platform: 'naukri' }))}
+                    className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                      searchFilters.platform === 'naukri'
+                        ? 'bg-orange-600 text-white border-transparent shadow-lg'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <Globe className="w-4 h-4" />
+                      <span className="text-sm">Naukri</span>
+                    </div>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  <Info className="w-3 h-3 inline mr-1" />
+                  Select LinkedIn to search specifically for LinkedIn profiles using your keywords
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
@@ -574,6 +708,12 @@ export const TalentScout: React.FC = () => {
                 <p className="text-gray-600">
                   Try adjusting your search filters or keywords
                 </p>
+                {searchMeta && (
+                  <p className="text-sm text-gray-500 mt-3">
+                    Searched {searchMeta.platform === 'both' ? 'LinkedIn and Naukri' : searchMeta.platform === 'linkedin' ? 'LinkedIn' : 'Naukri'} for
+                    <span className="font-semibold text-indigo-600"> "{searchMeta.searchKeywords}"</span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -588,6 +728,54 @@ export const TalentScout: React.FC = () => {
                     <span className="font-medium">Sorted by match score</span>
                   </div>
                 </div>
+
+                {searchMeta && (
+                  <div className="mb-4 bg-white border border-indigo-100 rounded-lg p-4 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-2">
+                      <Info className="w-4 h-4 text-indigo-500" />
+                      <span>
+                        <span className="font-semibold text-gray-900">{searchMeta.totalResults}</span>{' '}
+                        {searchMeta.totalResults === 1 ? 'profile' : 'profiles'} found for{' '}
+                        <span className="font-semibold text-indigo-600">"{searchMeta.searchKeywords}"</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {searchMeta.platform === 'linkedin' ? (
+                        <Linkedin className="w-4 h-4 text-blue-600" />
+                      ) : searchMeta.platform === 'naukri' ? (
+                        <Globe className="w-4 h-4 text-orange-500" />
+                      ) : (
+                        <>
+                          <Linkedin className="w-4 h-4 text-blue-600" />
+                          <Globe className="w-4 h-4 text-orange-500" />
+                        </>
+                      )}
+                      <span className="font-medium text-gray-800">
+                        {searchMeta.platform === 'both'
+                          ? 'LinkedIn + Naukri'
+                          : searchMeta.platform === 'linkedin'
+                            ? 'LinkedIn'
+                            : 'Naukri'}
+                      </span>
+                    </div>
+                    {searchMeta.linkedinIntegration && (
+                      <div
+                        className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wide ${
+                          searchMeta.linkedinIntegration.mode === 'production'
+                            ? 'border-green-200 bg-green-50 text-green-700'
+                            : 'border-blue-200 bg-blue-50 text-blue-700'
+                        }`}
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>
+                          LinkedIn{' '}
+                          {searchMeta.linkedinIntegration.mode === 'production' ? 'Live' : 'Demo Mode'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {candidates.map(candidate => renderCandidateCard(candidate))}
                 </div>
