@@ -1846,308 +1846,32 @@ app.put('/api/settings/ats', (req, res) => {
   res.json({ success: true, data: { atsThreshold: companySettings.atsThreshold, skillsKeywords: companySettings.skillsKeywords } });
 });
 
-let talentScoutProfiles = [
-  {
-    id: 'scout-1',
-    name: 'Priya Sharma',
-    email: 'priya.sharma@techcorp.com',
-    phone: '+91 9876543210',
-    skills: ['React', 'Node.js', 'TypeScript', 'MongoDB', 'AWS'],
-    experience: 5,
-    currentCompany: 'TechCorp Solutions',
-    currentRole: 'Senior Full Stack Developer',
-    location: 'Bangalore',
-    education: 'B.Tech Computer Science, IIT Delhi',
-    bio: 'Experienced full-stack developer with expertise in building scalable web applications using modern technologies. Passionate about clean code and best practices.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/priya-sharma',
-    atsScore: 88,
+const convertCandidateToTalentScoutProfile = (candidate) => {
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    email: candidate.email,
+    phone: candidate.phone || 'N/A',
+    skills: candidate.skills || [],
+    experience: candidate.experience || 0,
+    currentCompany: candidate.currentCompany || candidate.company || 'Not Specified',
+    currentRole: candidate.currentRole || candidate.domain || 'Not Specified',
+    location: candidate.location || 'Not Specified',
+    education: candidate.education || 'Not Specified',
+    bio: candidate.bio || `${candidate.domain || 'Professional'} with ${candidate.experience || 0} years of experience.`,
+    source: candidate.source || 'internal',
+    profileUrl: candidate.profileUrl || null,
+    atsScore: candidate.atsScore || candidate.score || 75,
     matchScore: 0,
-    availability: 'Immediate',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-2',
-    name: 'Rahul Mehta',
-    email: 'rahul.mehta@innovations.com',
-    phone: '+91 9876543211',
-    skills: ['Python', 'Machine Learning', 'TensorFlow', 'Data Analysis', 'AWS'],
-    experience: 6,
-    currentCompany: 'AI Innovations',
-    currentRole: 'Lead Data Scientist',
-    location: 'Mumbai',
-    education: 'M.Tech AI & ML, IIT Bombay',
-    bio: 'Data scientist specializing in machine learning and AI solutions. Led multiple successful projects in predictive analytics and recommendation systems.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/rahul-mehta',
-    atsScore: 92,
-    matchScore: 0,
-    availability: '15 Days',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-3',
-    name: 'Anjali Patel',
-    email: 'anjali.patel@webtech.com',
-    phone: '+91 9876543212',
-    skills: ['React', 'JavaScript', 'CSS', 'UI/UX', 'Figma'],
-    experience: 4,
-    currentCompany: 'WebTech Solutions',
-    currentRole: 'Frontend Developer',
-    location: 'Hyderabad',
-    education: 'B.E. Information Technology',
-    bio: 'Frontend developer focused on creating beautiful and performant user interfaces. Strong understanding of modern JavaScript frameworks and design principles.',
-    source: 'naukri',
-    atsScore: 85,
-    matchScore: 0,
-    availability: '1 Month',
-    status: 'discovered',
-    externalViewAvailable: false,
-    externalViewMessage: 'Full profile details available within HumaNet. Contact information and detailed experience visible in the detailed view.'
-  },
-  {
-    id: 'scout-4',
-    name: 'Karthik Kumar',
-    email: 'karthik.kumar@cloudserv.com',
-    phone: '+91 9876543213',
-    skills: ['AWS', 'Kubernetes', 'Docker', 'CI/CD', 'Terraform'],
-    experience: 7,
-    currentCompany: 'CloudServ Technologies',
-    currentRole: 'DevOps Architect',
-    location: 'Bangalore',
-    education: 'B.Tech Electronics, NIT Trichy',
-    bio: 'DevOps architect with extensive experience in cloud infrastructure and automation. Expert in building scalable and reliable systems on AWS.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/karthik-kumar',
-    atsScore: 90,
-    matchScore: 0,
-    availability: 'Immediate',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-5',
-    name: 'Sneha Reddy',
-    email: 'sneha.reddy@datasys.com',
-    phone: '+91 9876543214',
-    skills: ['Java', 'Spring Boot', 'Microservices', 'PostgreSQL', 'Kafka'],
-    experience: 5,
-    currentCompany: 'DataSys Corp',
-    currentRole: 'Backend Engineer',
-    location: 'Pune',
-    education: 'B.Tech Computer Science',
-    bio: 'Backend engineer specializing in building robust and scalable microservices architectures. Strong experience with Java ecosystem and distributed systems.',
-    source: 'naukri',
-    atsScore: 87,
-    matchScore: 0,
-    availability: '15 Days',
-    status: 'discovered',
-    externalViewAvailable: false,
-    externalViewMessage: 'Profile sourced from Naukri. Full details including work history and projects available in the detailed view.'
-  },
-  {
-    id: 'scout-6',
-    name: 'Vikram Singh',
-    email: 'vikram.singh@mobileapp.com',
-    phone: '+91 9876543215',
-    skills: ['React Native', 'iOS', 'Android', 'Swift', 'Kotlin'],
-    experience: 6,
-    currentCompany: 'MobileApp Innovations',
-    currentRole: 'Senior Mobile Developer',
-    location: 'Delhi',
-    education: 'B.Tech Software Engineering',
-    bio: 'Mobile developer with expertise in cross-platform app development. Built and published multiple apps with millions of downloads.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/vikram-singh',
-    atsScore: 89,
-    matchScore: 0,
-    availability: '1 Month',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-7',
-    name: 'Meera Iyer',
-    email: 'meera.iyer@uxdesign.com',
-    phone: '+91 9876543216',
-    skills: ['UI/UX', 'Figma', 'Adobe XD', 'User Research', 'Prototyping'],
-    experience: 5,
-    currentCompany: 'UX Design Studio',
-    currentRole: 'Senior UX Designer',
-    location: 'Chennai',
-    education: 'B.Des Industrial Design, NID',
-    bio: 'UX designer passionate about creating delightful user experiences. Led design for multiple award-winning products.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/meera-iyer',
-    atsScore: 86,
-    matchScore: 0,
-    availability: 'Immediate',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-8',
-    name: 'Arjun Nair',
-    email: 'arjun.nair@qatech.com',
-    phone: '+91 9876543217',
-    skills: ['Testing', 'Automation', 'Selenium', 'Cypress', 'JIRA'],
-    experience: 4,
-    currentCompany: 'QA Technologies',
-    currentRole: 'QA Lead',
-    location: 'Bangalore',
-    education: 'B.Tech Computer Science',
-    bio: 'QA engineer with strong automation skills. Built comprehensive test frameworks that significantly improved product quality.',
-    source: 'naukri',
-    atsScore: 84,
-    matchScore: 0,
-    availability: '15 Days',
-    status: 'discovered',
-    externalViewAvailable: false,
-    externalViewMessage: 'Candidate details available within the platform. Complete profile with certifications visible in detailed view.'
-  },
-  {
-    id: 'scout-9',
-    name: 'Divya Menon',
-    email: 'divya.menon@productco.com',
-    phone: '+91 9876543218',
-    skills: ['Product Management', 'Agile', 'Analytics', 'Market Research', 'Strategy'],
-    experience: 7,
-    currentCompany: 'ProductCo',
-    currentRole: 'Senior Product Manager',
-    location: 'Mumbai',
-    education: 'MBA, IIM Ahmedabad',
-    bio: 'Product manager with track record of launching successful products. Data-driven approach to product strategy and execution.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/divya-menon',
-    atsScore: 91,
-    matchScore: 0,
-    availability: '1 Month',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-10',
-    name: 'Rohan Desai',
-    email: 'rohan.desai@securetech.com',
-    phone: '+91 9876543219',
-    skills: ['Cybersecurity', 'Penetration Testing', 'Network Security', 'Python', 'Linux'],
-    experience: 6,
-    currentCompany: 'SecureTech Solutions',
-    currentRole: 'Security Engineer',
-    location: 'Pune',
-    education: 'B.Tech Information Security',
-    bio: 'Security engineer specializing in application and network security. Certified ethical hacker with experience in security audits.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/rohan-desai',
-    atsScore: 88,
-    matchScore: 0,
-    availability: 'Immediate',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-11',
-    name: 'Lakshmi Krishnan',
-    email: 'lakshmi.k@airesearch.com',
-    phone: '+91 9876543220',
-    skills: ['Python', 'Deep Learning', 'PyTorch', 'NLP', 'Computer Vision'],
-    experience: 5,
-    currentCompany: 'AI Research Labs',
-    currentRole: 'ML Research Engineer',
-    location: 'Bangalore',
-    education: 'M.S. Computer Science, Stanford',
-    bio: 'ML research engineer with publications in top-tier conferences. Expertise in NLP and computer vision applications.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/lakshmi-krishnan',
-    atsScore: 93,
-    matchScore: 0,
-    availability: '15 Days',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-12',
-    name: 'Sanjay Pillai',
-    email: 'sanjay.pillai@dataeng.com',
-    phone: '+91 9876543221',
-    skills: ['Spark', 'Hadoop', 'Kafka', 'Python', 'Big Data'],
-    experience: 6,
-    currentCompany: 'DataEng Solutions',
-    currentRole: 'Lead Data Engineer',
-    location: 'Hyderabad',
-    education: 'B.Tech Computer Science',
-    bio: 'Data engineer specializing in building large-scale data pipelines. Experience with petabyte-scale data processing systems.',
-    source: 'naukri',
-    atsScore: 86,
-    matchScore: 0,
-    availability: '1 Month',
-    status: 'discovered',
-    externalViewAvailable: false,
-    externalViewMessage: 'Profile details available in HumaNet. Complete work history and technical skills viewable in detailed profile.'
-  },
-  {
-    id: 'scout-13',
-    name: 'Pooja Gupta',
-    email: 'pooja.gupta@frontend.com',
-    phone: '+91 9876543222',
-    skills: ['Vue.js', 'TypeScript', 'Tailwind CSS', 'Testing', 'Webpack'],
-    experience: 4,
-    currentCompany: 'Frontend Masters',
-    currentRole: 'Frontend Developer',
-    location: 'Delhi',
-    education: 'B.Tech Information Technology',
-    bio: 'Frontend developer with strong focus on performance and accessibility. Advocate for modern web standards and best practices.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/pooja-gupta',
-    atsScore: 85,
-    matchScore: 0,
-    availability: 'Immediate',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-14',
-    name: 'Aditya Shah',
-    email: 'aditya.shah@blockchain.com',
-    phone: '+91 9876543223',
-    skills: ['Blockchain', 'Ethereum', 'Smart Contracts', 'Solidity', 'Web3'],
-    experience: 5,
-    currentCompany: 'Blockchain Innovations',
-    currentRole: 'Blockchain Developer',
-    location: 'Mumbai',
-    education: 'B.Tech Computer Science',
-    bio: 'Blockchain developer with expertise in building decentralized applications. Experience with multiple blockchain platforms.',
-    source: 'linkedin',
-    profileUrl: 'https://linkedin.com/in/aditya-shah',
-    atsScore: 87,
-    matchScore: 0,
-    availability: '15 Days',
-    status: 'discovered',
-    externalViewAvailable: true
-  },
-  {
-    id: 'scout-15',
-    name: 'Kavya Krishnan',
-    email: 'kavya.k@cloudarch.com',
-    phone: '+91 9876543224',
-    skills: ['AWS', 'Azure', 'GCP', 'Cloud Migration', 'Architecture'],
-    experience: 8,
-    currentCompany: 'CloudArch Consulting',
-    currentRole: 'Cloud Solutions Architect',
-    location: 'Bangalore',
-    education: 'B.E. Computer Science',
-    bio: 'Cloud architect with extensive experience in multi-cloud environments. Led numerous successful cloud migration projects.',
-    source: 'naukri',
-    atsScore: 90,
-    matchScore: 0,
-    availability: '1 Month',
-    status: 'discovered',
-    externalViewAvailable: false,
-    externalViewMessage: 'Comprehensive profile available in the system. Detailed certifications and project portfolio accessible in full view.'
-  }
-];
+    availability: candidate.availability || 'Not Specified',
+    status: candidate.talentScoutStatus || 'discovered',
+    externalViewAvailable: Boolean(candidate.profileUrl),
+    externalViewMessage: candidate.profileUrl
+      ? 'Opens the candidate profile in a new tab'
+      : 'Candidate profile available in HumaNet. Complete details accessible in the detailed view.',
+    invitedAt: candidate.invitedAt || null
+  };
+};
 
 const calculateMatchScore = (candidate, searchFilters) => {
   let score = 0;
@@ -2233,6 +1957,8 @@ app.post('/api/talent-scout/search', async (req, res) => {
     console.log(`[Talent Scout] Searching with HR-provided keywords: "${filters.keywords}"`);
     console.log(`[Talent Scout] Platform filter: ${filters.platform}`);
     
+    await refreshCandidatesFromDB();
+    
     let filteredResults = [];
     
     // Search LinkedIn profiles when platform includes LinkedIn
@@ -2241,42 +1967,49 @@ app.post('/api/talent-scout/search', async (req, res) => {
       const linkedInResults = await searchLinkedInProfiles(filters);
       filteredResults = [...filteredResults, ...linkedInResults];
     }
-    
+
+    console.log(`[Talent Scout] Searching candidates from database`);
     const allowedSources = selectedPlatform === 'linkedin'
       ? ['linkedin']
       : selectedPlatform === 'naukri'
         ? ['naukri', 'internal']
         : ['linkedin', 'naukri', 'internal'];
 
-    console.log(`[Talent Scout] Searching existing profiles from sources: ${allowedSources.join(', ')}`);
-    const existingResults = talentScoutProfiles.filter(profile => {
-      if (!allowedSources.includes(profile.source)) {
+    const candidateResults = candidates.filter(candidate => {
+      const candidateSource = candidate.source || 'internal';
+      if (!allowedSources.includes(candidateSource)) {
         return false;
       }
-      
+
       const keywordLower = filters.keywords.toLowerCase();
       const keywordMatch = 
-        profile.name.toLowerCase().includes(keywordLower) ||
-        profile.currentRole.toLowerCase().includes(keywordLower) ||
-        (profile.bio && profile.bio.toLowerCase().includes(keywordLower)) ||
-        profile.skills.some(skill => skill.toLowerCase().includes(keywordLower));
+        candidate.name.toLowerCase().includes(keywordLower) ||
+        (candidate.domain && candidate.domain.toLowerCase().includes(keywordLower)) ||
+        (candidate.currentRole && candidate.currentRole.toLowerCase().includes(keywordLower)) ||
+        (candidate.bio && candidate.bio.toLowerCase().includes(keywordLower)) ||
+        (candidate.skills && candidate.skills.some(skill => skill.toLowerCase().includes(keywordLower)));
       
       if (!keywordMatch) return false;
       
       if (filters.location && filters.location.trim()) {
-        const locationMatch = profile.location.toLowerCase().includes(filters.location.toLowerCase());
+        const locationMatch = candidate.location && candidate.location.toLowerCase().includes(filters.location.toLowerCase());
         if (!locationMatch) return false;
       }
       
-      if (profile.experience < filters.experience.min || profile.experience > filters.experience.max) {
+      const candidateExperience = typeof candidate.experience === 'number'
+        ? candidate.experience
+        : Number.parseFloat(candidate.experience) || 0;
+
+      if (candidateExperience < filters.experience.min || candidateExperience > filters.experience.max) {
         return false;
       }
       
       if (filters.skills.length > 0) {
-        const profileSkillsLower = profile.skills.map(s => s.toLowerCase());
+        const candidateSkills = candidate.skills || [];
+        const candidateSkillsLower = candidateSkills.map(s => s.toLowerCase());
         const hasRequiredSkills = filters.skills.some(reqSkill => 
-          profileSkillsLower.some(profileSkill => 
-            profileSkill.includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(profileSkill)
+          candidateSkillsLower.some(candidateSkill => 
+            candidateSkill.includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(candidateSkill)
           )
         );
         if (!hasRequiredSkills) return false;
@@ -2285,7 +2018,8 @@ app.post('/api/talent-scout/search', async (req, res) => {
       return true;
     });
     
-    filteredResults = [...filteredResults, ...existingResults];
+    const convertedCandidates = candidateResults.map(convertCandidateToTalentScoutProfile);
+    filteredResults = [...filteredResults, ...convertedCandidates];
     
     // Calculate match scores for all results
     filteredResults = filteredResults.map(profile => {
@@ -2328,9 +2062,22 @@ app.post('/api/talent-scout/search', async (req, res) => {
   }
 });
 
-app.get('/api/talent-scout/candidates', (req, res) => {
-  const invitedProfiles = talentScoutProfiles.filter(p => p.status === 'invited');
-  res.json({ success: true, data: invitedProfiles });
+app.get('/api/talent-scout/candidates', async (req, res) => {
+  try {
+    await refreshCandidatesFromDB();
+    const invitedCandidates = candidates
+      .filter(candidate => candidate.talentScoutStatus === 'invited')
+      .map(convertCandidateToTalentScoutProfile)
+      .map(profile => ({
+        ...profile,
+        matchScore: profile.matchScore || 85
+      }));
+
+    res.json({ success: true, data: invitedCandidates });
+  } catch (error) {
+    console.error('Failed to fetch talent scout candidates:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch saved candidates' });
+  }
 });
 
 app.get('/api/talent-scout/linkedin-status', (req, res) => {
@@ -2340,29 +2087,62 @@ app.get('/api/talent-scout/linkedin-status', (req, res) => {
     data: status,
     message: status.configured 
       ? 'LinkedIn integration is configured and active'
-      : 'LinkedIn integration running in mock mode. Configure LINKEDIN_API_KEY in .env for production use.'
+      : 'LinkedIn integration not configured. Set LINKEDIN_API_KEY and enable LINKEDIN_INTEGRATION_ENABLED in .env to connect to LinkedIn API. Currently showing candidates from your database.'
   });
 });
 
-app.post('/api/talent-scout/invite', (req, res) => {
+app.post('/api/talent-scout/invite', async (req, res) => {
   try {
-    const { candidateId, jobId, message } = req.body;
+    const { candidateId, message } = req.body;
     
-    const profile = talentScoutProfiles.find(p => p.id === candidateId);
-    
-    if (!profile) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Profile not found' 
+    await refreshCandidatesFromDB();
+
+    const candidateIndex = candidates.findIndex(candidate => candidate.id === candidateId);
+    if (candidateIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
       });
     }
-    
-    profile.status = 'invited';
-    profile.invitedAt = new Date();
-    
+
+    const candidate = candidates[candidateIndex];
+    const invitedAt = new Date().toISOString();
+
+    const updatedCandidate = {
+      ...candidate,
+      talentScoutStatus: 'invited',
+      invitedAt,
+      lastTalentScoutMessage: message || candidate.lastTalentScoutMessage || null
+    };
+
+    candidates[candidateIndex] = updatedCandidate;
+
+    if (candidateCollection) {
+      try {
+        await candidateCollection.updateOne(
+          { id: candidateId },
+          {
+            $set: {
+              talentScoutStatus: updatedCandidate.talentScoutStatus,
+              invitedAt: updatedCandidate.invitedAt,
+              lastTalentScoutMessage: updatedCandidate.lastTalentScoutMessage || null
+            }
+          }
+        );
+      } catch (dbError) {
+        console.error('Failed to persist talent scout invite status:', dbError);
+      }
+    }
+
+    const baseTalentScoutProfile = convertCandidateToTalentScoutProfile(updatedCandidate);
+    const talentScoutProfile = {
+      ...baseTalentScoutProfile,
+      matchScore: baseTalentScoutProfile.matchScore || 85
+    };
+
     notifications.unshift({
       id: `notif-${Date.now()}`,
-      message: `Invitation sent to ${profile.name} for internal opportunity`,
+      message: `Invitation sent to ${updatedCandidate.name} for internal opportunity`,
       type: 'talent-scout',
       read: false,
       timestamp: new Date()
@@ -2370,8 +2150,8 @@ app.post('/api/talent-scout/invite', (req, res) => {
     
     res.json({ 
       success: true, 
-      message: `Successfully contacted ${profile.name}`,
-      data: profile
+      message: `Successfully contacted ${updatedCandidate.name}`,
+      data: talentScoutProfile
     });
   } catch (error) {
     console.error('Talent scout invite error:', error);
@@ -2412,29 +2192,46 @@ app.post('/api/talent-scout/upload', upload.array('resumes', 10), async (req, re
       const experienceMatch = extractedText.match(/(\d+)\+?\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|exp)/i);
       const locationMatch = extractedText.match(/(?:location|based in|city)[\s:]+([A-Z][a-zA-Z\s]+)(?:\n|,|\.|$)/i);
 
-      const profile = {
-        id: `scout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      const candidateId = `cand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const candidateSkills = [...new Set(skillsMatch.map(skill => skill.charAt(0).toUpperCase() + skill.slice(1).toLowerCase()))];
+
+      const candidateRecord = {
+        id: candidateId,
         name: file.originalname.replace(/\.(pdf|docx)$/i, '').replace(/[-_]/g, ' '),
         email: emailMatch ? emailMatch[0] : `employee${Date.now()}@company.com`,
         phone: phoneMatch ? phoneMatch[0] : '+91 9876543210',
-        skills: [...new Set(skillsMatch.map(skill => skill.charAt(0).toUpperCase() + skill.slice(1).toLowerCase()))],
-        experience: experienceMatch ? parseInt(experienceMatch[1]) : Math.floor(Math.random() * 8) + 2,
+        skills: candidateSkills,
+        experience: experienceMatch ? parseInt(experienceMatch[1], 10) : 0,
         currentCompany: 'Current Organization',
         currentRole: 'Software Professional',
-        location: locationMatch ? locationMatch[1].trim() : ['Bangalore', 'Mumbai', 'Hyderabad', 'Pune'][Math.floor(Math.random() * 4)],
+        location: locationMatch ? locationMatch[1].trim() : 'Not Specified',
         education: 'B.Tech Computer Science',
-        bio: extractedText.substring(0, 200).trim() + '...',
+        bio: extractedText ? extractedText.substring(0, 200).trim() + '...' : null,
         source: 'internal',
         atsScore: Math.floor(Math.random() * 20) + 80,
-        matchScore: 0,
-        availability: 'Available',
-        status: 'discovered',
+        availability: 'Not Specified',
+        status: 'pending',
         resumeUrl: `/uploads/${file.filename}`,
-        createdAt: new Date()
+        createdAt: new Date(),
+        talentScoutStatus: 'discovered',
+        invitedAt: null,
+        lastTalentScoutMessage: null
       };
 
-      talentScoutProfiles.push(profile);
-      parsedProfiles.push(profile);
+      candidates.push(candidateRecord);
+      parsedProfiles.push(convertCandidateToTalentScoutProfile(candidateRecord));
+
+      if (candidateCollection) {
+        try {
+          await candidateCollection.updateOne(
+            { id: candidateRecord.id },
+            { $set: candidateRecord },
+            { upsert: true }
+          );
+        } catch (dbError) {
+          console.error('Failed to persist uploaded talent scout profile:', dbError);
+        }
+      }
     }
 
     res.json({ success: true, data: parsedProfiles, message: `Successfully uploaded ${parsedProfiles.length} profile(s)` });

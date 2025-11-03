@@ -399,7 +399,7 @@ export const TalentScout: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Talent Scout</h1>
               <p className="text-gray-600">
-                Discover and connect with top talent from LinkedIn & Naukri using HR-provided keywords
+                Discover and connect with top talent from your candidate database
               </p>
             </div>
           </div>
@@ -440,7 +440,7 @@ export const TalentScout: React.FC = () => {
                   }`}>
                     {linkedInStatus.mode === 'production'
                       ? 'Connected to LinkedIn API. Search results include live LinkedIn profiles based on your keywords.'
-                      : 'Currently running with sample LinkedIn profiles. Configure LINKEDIN_API_KEY in environment settings to enable live searches.'}
+                      : 'LinkedIn integration not configured. Currently showing candidates from your database. Configure LINKEDIN_API_KEY and enable LINKEDIN_INTEGRATION_ENABLED in environment settings to enable LinkedIn searches.'}
                   </p>
                 </div>
                 <LinkIcon className={`w-4 h-4 ${

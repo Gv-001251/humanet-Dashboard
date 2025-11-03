@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Talent Scout feature now includes LinkedIn integration, allowing HR to search for candidate profiles directly from LinkedIn using keywords. This integration provides a powerful way to discover external talent based on job titles, skills, and other criteria specified by HR.
+The Talent Scout feature can connect to LinkedIn, allowing HR to search for candidate profiles directly from LinkedIn using keywords when configured. When LinkedIn integration is not enabled, Talent Scout falls back to your HumaNet candidate database so the experience remains fully functional.
 
 ## Features
 
-- **Keyword-Based Search**: HR can enter keywords (job titles, skills, roles) to search LinkedIn profiles
+- **Keyword-Based Search**: HR can enter keywords (job titles, skills, roles) to search linked sources
 - **Platform Selection**: Choose to search LinkedIn only, Naukri only, or both platforms
 - **Filtering Options**: Filter results by location, experience range, and required skills
 - **Match Scoring**: Candidates are automatically scored based on how well they match the search criteria
@@ -14,13 +14,13 @@ The Talent Scout feature now includes LinkedIn integration, allowing HR to searc
 
 ## Configuration
 
-### Demo Mode (Default)
+### Default Mode (Database Search)
 
-By default, the system runs in demo mode using sample LinkedIn profiles. This allows you to test the functionality without requiring LinkedIn API credentials.
+By default, the Talent Scout searches the HumaNet candidate database for matching profiles. This allows you to use the full functionality without requiring LinkedIn API credentials.
 
 ### Production Mode (Live LinkedIn API)
 
-To enable live LinkedIn searches:
+To search external candidates from LinkedIn in addition to your database:
 
 1. **Obtain LinkedIn API Credentials**:
    - Register your application at [LinkedIn Developers](https://www.linkedin.com/developers/)
@@ -107,12 +107,12 @@ Check the current LinkedIn integration status.
 
 1. **Navigate to Talent Scout**: Access the Talent Scout module from the sidebar
 2. **Enter Search Keywords**: Type in job titles, roles, or skills you're looking for (e.g., "Senior Frontend Developer", "Machine Learning Engineer")
-3. **Select Platform**: Choose "LinkedIn" to specifically search LinkedIn profiles
+3. **Select Platform**: Choose "LinkedIn" to search external LinkedIn profiles (if configured), or use default to search your database
 4. **Add Filters** (Optional):
    - Location: Specify the desired location
    - Experience Range: Set minimum and maximum years of experience
    - Required Skills: Add specific technical skills required
-5. **Click Search**: The system will search LinkedIn using your keywords and display matching profiles
+5. **Click Search**: The system will search candidates using your keywords and display matching profiles from your database (and LinkedIn if configured)
 6. **Review Results**: Profiles are sorted by match score showing how well they match your criteria
 7. **Invite Candidates**: Send invitations to promising candidates directly from the interface
 
@@ -124,7 +124,7 @@ The LinkedIn integration is implemented as a modular service that:
 - Handles API authentication
 - Performs keyword-based searches
 - Processes and normalizes LinkedIn profile data
-- Provides fallback to demo data when API is not configured
+- Provides seamless fallback to the HumaNet candidate database when the API is not configured
 
 ### Search Flow
 
@@ -135,12 +135,12 @@ Frontend sends search request with keywords & platform filter
     ↓
 Backend checks LinkedIn integration status
     ↓
-If enabled: Call LinkedIn API with keywords
-If disabled: Use mock LinkedIn profiles
+If enabled: Call LinkedIn API with keywords and merge results
+Always: Search HumaNet candidate database
     ↓
 Filter and score results based on criteria
     ↓
-Return sorted results to frontend
+Remove duplicates and return sorted results to frontend
 ```
 
 ### Key Functions
@@ -177,14 +177,14 @@ Return sorted results to frontend
 
 ## Troubleshooting
 
-### Issue: "LinkedIn integration running in mock mode"
-**Solution**: Configure LinkedIn API credentials in `.env` file and set `LINKEDIN_INTEGRATION_ENABLED=true`
+### Issue: "LinkedIn integration not configured"
+**Solution**: Configure LinkedIn API credentials in `.env` file and set `LINKEDIN_INTEGRATION_ENABLED=true`. Until then, Talent Scout will continue to use your HumaNet candidate database.
 
 ### Issue: No results returned
 **Possible causes**:
 - Keywords too specific - try broader search terms
 - Filters too restrictive - adjust experience range or remove some skill requirements
-- API rate limit exceeded - wait before retrying
+- API rate limit exceeded (if LinkedIn enabled) - wait before retrying
 - API credentials expired - refresh OAuth token
 
 ### Issue: "Failed to search candidates"
