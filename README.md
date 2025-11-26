@@ -2,7 +2,7 @@
 
 A comprehensive HR Management Platform with advanced features integrated with MongoDB Atlas backend and React + TypeScript frontend.
 
-## 🚀 Features
+##  Features
 
 ### 1. **HR Dashboard**
 - Real-time employee statistics
@@ -90,7 +90,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - Budget allocation guidance
 - Skill gap analysis
 
-## 🗄️ Technology Stack
+## Technology Stack
 
 ### Backend
 - **Runtime:** Node.js
@@ -109,7 +109,7 @@ A comprehensive HR Management Platform with advanced features integrated with Mo
 - **Charts:** Recharts
 - **Build Tool:** Vite
 
-## 📋 MongoDB Configuration
+## MongoDB Configuration
 
 ```
 URI: mongodb+srv://navageevithang_db_user:<db_password>@humanet-cluster.h99gras.mongodb.net/
@@ -120,7 +120,7 @@ Frontend Port: 5173
 
 **Note**: Replace `<db_password>` with your actual MongoDB Atlas password. The application is configured with MongoDB Atlas. If the connection fails, it will automatically fall back to in-memory storage. See `MONGODB_ATLAS_SETUP.md` for detailed information.
 
-## 🗂️ MongoDB Collections
+##  MongoDB Collections
 
 ### 1. Employees Collection
 ```javascript
@@ -338,7 +338,7 @@ Open your browser and navigate to `http://localhost:5173`
 ### Dashboard Routes
 - `GET /api/dashboard/stats` - Get dashboard statistics
 
-## 🔒 Security Features
+##  Security Features
 
 - Input validation on all forms
 - File upload validation (type, size limits)
@@ -357,7 +357,7 @@ Open your browser and navigate to `http://localhost:5173`
 - Optimized file sizes
 - Caching for frequently accessed data
 
-## 🎨 UI/UX Features
+##  UI/UX Features
 
 - Modern, clean interface
 - Professional HR-focused design
@@ -367,7 +367,7 @@ Open your browser and navigate to `http://localhost:5173`
 - Toast notifications for errors/success
 - Touch-friendly buttons (min 44px)
 
-## 📊 Analytics & Reporting
+##  Analytics & Reporting
 
 - Dashboard with key metrics
 - Export reports in CSV/Excel format
@@ -375,14 +375,14 @@ Open your browser and navigate to `http://localhost:5173`
 - Date range filters
 - Comparison views (month-over-month, year-over-year)
 
-## 🧪 Testing
+##  Testing
 
 Run tests:
 ```bash
 npm test
 ```
 
-## 📦 Build for Production
+##  Build for Production
 
 Build frontend:
 ```bash
@@ -391,7 +391,7 @@ npm run build
 
 Build output will be in the `dist/` directory.
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -399,15 +399,15 @@ Build output will be in the `dist/` directory.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
+##  License
 
 This project is licensed under the ISC License.
 
-## 👥 Team
+##  Team
 
 Built by the Humanet team for comprehensive HR management needs.
 
-## 📧 Support
+##  Support
 
 For support, email support@humanet.com or create an issue in the repository.
 
