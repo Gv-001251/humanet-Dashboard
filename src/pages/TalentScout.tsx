@@ -148,12 +148,6 @@ export const TalentScout: React.FC = () => {
     setShowInviteModal(true);
   };
 
-  const mergeCandidates = (current: ExternalCandidate[], incoming: ExternalCandidate[]) => {
-    const existingIds = new Set(current.map(c => c.id));
-    const uniqueIncoming = incoming.filter(c => !existingIds.has(c.id));
-    return [...current, ...uniqueIncoming];
-  };
-
   const handleSendInvite = async () => {
     if (!selectedCandidate) return;
 

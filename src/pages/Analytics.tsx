@@ -8,8 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   RadarChart,

@@ -41,19 +41,22 @@ export const HireSmart: React.FC = () => {
 
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
-        const parsedCandidates: Candidate[] = data.data.map((candidate: any): Candidate => ({
-          id: String(candidate.id ?? candidate._id ?? `cand-${Date.now()}`),
-          name: candidate.name ?? 'Unknown Candidate',
-          email: candidate.email ?? 'unknown@example.com',
-          phone: candidate.phone ?? '+91 9876543210',
-          skills: Array.isArray(candidate.skills) ? candidate.skills : [],
-          experience: Number(candidate.experience ?? candidate.experience_years ?? 0),
-          ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
-          location: candidate.location ?? 'Bangalore',
-          domain: candidate.domain ?? 'General',
-          status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
-          education: candidate.education ?? 'Not specified'
-        }));
+        const parsedCandidates: Candidate[] = data.data.map((candidate: unknown): Candidate => {
+          const cand = candidate as Record<string, unknown>;
+          return {
+            id: String(cand.id ?? cand._id ?? `cand-${Date.now()}`),
+            name: String(cand.name ?? 'Unknown Candidate'),
+            email: String(cand.email ?? 'unknown@example.com'),
+            phone: String(cand.phone ?? '+91 9876543210'),
+            skills: Array.isArray(cand.skills) ? cand.skills as string[] : [],
+            experience: Number(cand.experience ?? cand.experience_years ?? 0),
+            ctc: Number(cand.ctc ?? cand.expected_ctc ?? 0),
+            location: String(cand.location ?? 'Bangalore'),
+            domain: String(cand.domain ?? 'General'),
+            status: (cand.status === 'shortlisted' || cand.status === 'rejected') ? cand.status as 'pending' | 'shortlisted' | 'rejected' : 'pending',
+            education: String(cand.education ?? 'Not specified')
+          };
+        });
         setCandidates(parsedCandidates);
       }
     } catch (error) {
@@ -86,19 +89,22 @@ export const HireSmart: React.FC = () => {
 
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
-        const parsedCandidates: Candidate[] = data.data.map((candidate: any): Candidate => ({
-          id: String(candidate.id ?? candidate._id ?? `cand-${Date.now()}`),
-          name: candidate.name ?? 'Unknown Candidate',
-          email: candidate.email ?? 'unknown@example.com',
-          phone: candidate.phone ?? '+91 9876543210',
-          skills: Array.isArray(candidate.skills) ? candidate.skills : [],
-          experience: Number(candidate.experience ?? candidate.experience_years ?? 0),
-          ctc: Number(candidate.ctc ?? candidate.expected_ctc ?? 0),
-          location: candidate.location ?? 'Bangalore',
-          domain: candidate.domain ?? 'General',
-          status: (candidate.status === 'shortlisted' || candidate.status === 'rejected') ? candidate.status : 'pending',
-          education: candidate.education ?? 'Not specified'
-        }));
+        const parsedCandidates: Candidate[] = data.data.map((candidate: unknown): Candidate => {
+          const cand = candidate as Record<string, unknown>;
+          return {
+            id: String(cand.id ?? cand._id ?? `cand-${Date.now()}`),
+            name: String(cand.name ?? 'Unknown Candidate'),
+            email: String(cand.email ?? 'unknown@example.com'),
+            phone: String(cand.phone ?? '+91 9876543210'),
+            skills: Array.isArray(cand.skills) ? cand.skills as string[] : [],
+            experience: Number(cand.experience ?? cand.experience_years ?? 0),
+            ctc: Number(cand.ctc ?? cand.expected_ctc ?? 0),
+            location: String(cand.location ?? 'Bangalore'),
+            domain: String(cand.domain ?? 'General'),
+            status: (cand.status === 'shortlisted' || cand.status === 'rejected') ? cand.status as 'pending' | 'shortlisted' | 'rejected' : 'pending',
+            education: String(cand.education ?? 'Not specified')
+          };
+        });
         setCandidates(prev => [...prev, ...parsedCandidates]);
         alert(`Successfully uploaded ${parsedCandidates.length} resume(s)!`);
       }
