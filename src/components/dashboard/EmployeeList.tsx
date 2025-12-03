@@ -22,7 +22,7 @@ export const EmployeeList: React.FC = () => {
     const fetchEmployees = async () => {
       try {
         const response = await employeeAPI.getAll();
-        setEmployees(response.data || []);
+        setEmployees((response.data as Employee[]) || []);
       } catch (err) {
         setError('Failed to load employees. Please try again later.');
         console.error(err);

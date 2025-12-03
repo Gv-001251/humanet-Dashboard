@@ -1,5 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
 const defaultHeaders = {
   'Content-Type': 'application/json',
   Accept: 'application/json'
@@ -61,9 +67,9 @@ export const api = {
 };
 
 export const employeeAPI = {
-  getAll: () => api.get<{ success: boolean; data: any[] }>('/employees'),
-  getById: (id: string) => api.get<{ success: boolean; data: any }>(`/employees/${id}`),
-  create: (data: any) => api.post<{ success: boolean; data: any }>('/employees', data),
-  update: (id: string, data: any) => api.put<{ success: boolean; data: any }>(`/employees/${id}`, data),
-  delete: (id: string) => api.delete<{ success: boolean; message: string }>(`/employees/${id}`)
+  getAll: () => api.get<ApiResponse<unknown[]>>('/employees'),
+  getById: (id: string) => api.get<ApiResponse<unknown>>(`/employees/${id}`),
+  create: (data: unknown) => api.post<ApiResponse<unknown>>('/employees', data),
+  update: (id: string, data: unknown) => api.put<ApiResponse<unknown>>(`/employees/${id}`, data),
+  delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/employees/${id}`)
 };

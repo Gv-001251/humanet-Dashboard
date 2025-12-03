@@ -754,8 +754,6 @@ export const AutoMatch: React.FC = () => {
                 project.selectedEmployeeIds.includes(employee.id)
               );
               const selectedCount = selectedEmployees.length;
-              const assignedCount = project.status === 'assigned' ? project.assignedEmployees.length : selectedCount;
-              const suggestionsCount = project.suggestedEmployees.length;
               const showOverSelection = selectedCount > project.recommendedTeamSize;
 
               return (

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/common/Button';
-import { DollarSign, TrendingUp, MapPin, Award } from 'lucide-react';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { DollarSign, TrendingUp, Award } from 'lucide-react';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface PredictionResult {
   role: string;

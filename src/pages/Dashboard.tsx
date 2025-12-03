@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
-import { Users, Briefcase, TrendingUp, Clock, DollarSign, Activity, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Users, Briefcase, TrendingUp, Clock, Activity, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 
 const COLORS = ['#1E40AF', '#059669', '#D97706', '#DC2626', '#0284C7'];
