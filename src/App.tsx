@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { Dashboard } from './pages/Dashboard';
 import { HireSmart } from './pages/HireSmart';
+import { HireSmartResumeScreener } from './pages/HireSmartResumeScreener';
 import { AutoMatch } from './pages/AutoMatch';
 import { TalentScout } from './pages/TalentScout';
 import { SalaryAnalysis } from './pages/SalaryAnalysis';
@@ -18,6 +19,7 @@ const AppRoutes = () => (
     <Route path="/" element={<Navigate to="/dashboard" replace />} />
     <Route path="/dashboard" element={<Dashboard />} />
     <Route path="/hiresmart" element={<HireSmart />} />
+    <Route path="/hiresmart-resume-screener" element={<HireSmartResumeScreener />} />
     <Route path="/automatch" element={<AutoMatch />} />
     <Route path="/talent-scout" element={<TalentScout />} />
     <Route path="/salary-analysis" element={<SalaryAnalysis />} />
