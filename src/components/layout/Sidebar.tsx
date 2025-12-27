@@ -10,12 +10,14 @@ import {
   Settings,
   HelpCircle,
   User as UserIcon,
-  Search
+  Search,
+  Sparkles
 } from 'lucide-react';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard Overview' },
   { path: '/hiresmart', label: 'HireSmart', icon: Target, tooltip: 'Upload & Parse Resumes' },
+  { path: '/hiresmart-resume-screener', label: 'AI Resume Screener', icon: Sparkles, tooltip: 'AI-Powered Resume Analysis' },
   { path: '/talent-scout', label: 'Talent Scout', icon: Search, tooltip: 'Search LinkedIn & Naukri' },
   { path: '/automatch', label: 'AutoMatch', icon: Users, tooltip: 'AI-Powered Team Matching' },
   { path: '/salary-analysis', label: 'Salary Analysis', icon: DollarSign, tooltip: 'Salary Benchmarking' },
