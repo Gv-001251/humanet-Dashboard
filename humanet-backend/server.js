@@ -16,8 +16,8 @@ const {
   getExperienceFromSalary
 } = require('./src/services/salaryPredictionEngine');
 const { sendShortlistEmail, sendRejectionEmail } = require('./src/services/emailService');
-const { 
-  searchLinkedInProfiles, 
+const {
+  searchLinkedInProfiles,
   getConfigurationStatus
 } = require('./src/services/linkedinIntegrationService');
 
@@ -121,8 +121,16 @@ const normalizeCandidate = (candidate) => {
     return null;
   }
 
-  const normalized = { ...candidate };
-  normalized.createdAt = candidate?.createdAt ? new Date(candidate.createdAt) : new Date();
+  const normalized = {
+    id: candidate.id,
+    name: candidate.candidate_name || candidate.name, // Handle both DB and local format
+    email: candidate.email,
+    resumeUrl: candidate.resume_url || candidate.resumeUrl,
+    skills: candidate.extracted_skills || candidate.skills || [],
+    ctc: candidate.detected_ctc || candidate.ctc,
+    aiAnalysis: candidate.ai_analysis || candidate.aiAnalysis,
+    createdAt: candidate.created_at ? new Date(candidate.created_at) : (candidate.createdAt ? new Date(candidate.createdAt) : new Date())
+  };
   return normalized;
 };
 
@@ -130,9 +138,7 @@ const mapCandidateDocument = (doc) => {
   if (!doc) {
     return null;
   }
-
-  const { _id, ...rest } = doc;
-  return normalizeCandidate(rest);
+  return normalizeCandidate(doc);
 };
 
 const refreshCandidatesFromDB = async () => {
@@ -142,7 +148,7 @@ const refreshCandidatesFromDB = async () => {
 
   try {
     const { data: docs, error } = await supabase
-      .from('candidates')
+      .from('hiresmart_reviews') // UPDATED: Use hiresmart_reviews instead of candidates
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -168,21 +174,21 @@ const initializeDatabase = async () => {
       return;
     }
 
-    // Check if candidates table exists and has data
+    // Check if hiresmart_reviews table exists and has data
     const { data: existingCandidates, error } = await supabase
-      .from('candidates')
+      .from('hiresmart_reviews') // UPDATED
       .select('*')
       .limit(1);
 
     if (error) {
-      console.error('Error checking candidates table:', error);
+      console.error('Error checking hiresmart_reviews table:', error);
       return;
     }
 
     if (existingCandidates && existingCandidates.length > 0) {
       // Load all candidates from Supabase
       const { data: allCandidates } = await supabase
-        .from('candidates')
+        .from('hiresmart_reviews') // UPDATED
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -191,16 +197,26 @@ const initializeDatabase = async () => {
       }
     } else if (candidates.length > 0) {
       // Seed initial data if table is empty
-      const documents = candidates.map(candidate => normalizeCandidate(candidate)).filter(Boolean);
-      if (documents.length > 0) {
+      // Map local candidates to DB schema
+      const dbDocuments = candidates.map(c => ({
+        candidate_name: c.name,
+        email: c.email,
+        resume_url: c.resumeUrl,
+        extracted_skills: c.skills,
+        detected_ctc: c.ctc, // Ensure this matches schema constraints (nullable)
+        created_at: c.createdAt
+      }));
+
+      if (dbDocuments.length > 0) {
         const { error: insertError } = await supabase
-          .from('candidates')
-          .insert(documents);
+          .from('hiresmart_reviews') // UPDATED
+          .insert(dbDocuments);
 
         if (insertError) {
           console.error('Error seeding initial candidates:', insertError);
         } else {
-          candidates = documents.map(candidate => ({ ...candidate }));
+          // Reload to get generated IDs
+          await refreshCandidatesFromDB();
         }
       }
     }
@@ -1319,7 +1335,7 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
             // Upload file to Supabase storage
             const fileContent = fs.readFileSync(file.path);
             const filePath = `resumes/${file.filename}`;
-            
+
             const { data: uploadData, error: uploadError } = await supabase
               .storage
               .from('resumes')
@@ -1388,21 +1404,21 @@ app.get('/api/candidates/:id', async (req, res) => {
     let candidate = candidates.find(c => c.id === candidateId);
 
     if (supabase) {
-     const { data: document, error } = await supabase
-       .from('candidates')
-       .select('*')
-       .eq('id', candidateId)
-       .single();
+      const { data: document, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .eq('id', candidateId)
+        .single();
 
-     if (!error && document) {
-       candidate = mapCandidateDocument(document);
-       const existingIndex = candidates.findIndex(c => c.id === candidateId);
-       if (existingIndex !== -1) {
-         candidates[existingIndex] = candidate;
-       } else if (candidate) {
-         candidates.push(candidate);
-       }
-     }
+      if (!error && document) {
+        candidate = mapCandidateDocument(document);
+        const existingIndex = candidates.findIndex(c => c.id === candidateId);
+        if (existingIndex !== -1) {
+          candidates[existingIndex] = candidate;
+        } else if (candidate) {
+          candidates.push(candidate);
+        }
+      }
     }
 
     if (!candidate) {
@@ -1431,16 +1447,16 @@ app.put('/api/candidates/:id/status', async (req, res) => {
     let candidate = candidates.find(c => c.id === candidateId);
 
     if (!candidate && supabase) {
-     const { data: existing, error } = await supabase
-       .from('candidates')
-       .select('*')
-       .eq('id', candidateId)
-       .single();
+      const { data: existing, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .eq('id', candidateId)
+        .single();
 
-     if (!error && existing) {
-       candidate = mapCandidateDocument(existing);
-       candidates.push(candidate);
-     }
+      if (!error && existing) {
+        candidate = mapCandidateDocument(existing);
+        candidates.push(candidate);
+      }
     }
 
     if (!candidate) {
@@ -1452,24 +1468,24 @@ app.put('/api/candidates/:id/status', async (req, res) => {
     candidate.status = normalizedStatus;
 
     if (supabase) {
-     try {
-       const { error } = await supabase
-         .from('candidates')
-         .update({ status: normalizedStatus })
-         .eq('id', candidateId);
+      try {
+        const { error } = await supabase
+          .from('candidates')
+          .update({ status: normalizedStatus })
+          .eq('id', candidateId);
 
-       if (error) {
-         console.error('Failed to update candidate status in Supabase:', error);
-       } else {
-         await refreshCandidatesFromDB();
-         const refreshedCandidate = candidates.find(c => c.id === candidateId);
-         if (refreshedCandidate) {
-           candidate = refreshedCandidate;
-         }
-       }
-     } catch (error) {
-       console.error('Failed to update candidate status in Supabase:', error);
-     }
+        if (error) {
+          console.error('Failed to update candidate status in Supabase:', error);
+        } else {
+          await refreshCandidatesFromDB();
+          const refreshedCandidate = candidates.find(c => c.id === candidateId);
+          if (refreshedCandidate) {
+            candidate = refreshedCandidate;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update candidate status in Supabase:', error);
+      }
     }
 
     if (normalizedStatus === 'shortlisted' && previousStatus !== 'shortlisted') {
@@ -1543,43 +1559,43 @@ app.delete('/api/candidates/:id', async (req, res) => {
     let candidate = candidateIndex !== -1 ? candidates[candidateIndex] : null;
 
     if (supabase) {
-     try {
-       // First, get the candidate to check if it exists
-       const { data: existingCandidate, error: fetchError } = await supabase
-         .from('candidates')
-         .select('*')
-         .eq('id', candidateId)
-         .single();
+      try {
+        // First, get the candidate to check if it exists
+        const { data: existingCandidate, error: fetchError } = await supabase
+          .from('candidates')
+          .select('*')
+          .eq('id', candidateId)
+          .single();
 
-       if (fetchError) {
-         console.error('Failed to fetch candidate from Supabase:', fetchError);
-         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
-       }
+        if (fetchError) {
+          console.error('Failed to fetch candidate from Supabase:', fetchError);
+          return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+        }
 
-       if (!existingCandidate && !candidate) {
-         return res.status(404).json({ success: false, message: 'Candidate not found' });
-       }
+        if (!existingCandidate && !candidate) {
+          return res.status(404).json({ success: false, message: 'Candidate not found' });
+        }
 
-       if (existingCandidate) {
-         candidate = mapCandidateDocument(existingCandidate);
-       }
+        if (existingCandidate) {
+          candidate = mapCandidateDocument(existingCandidate);
+        }
 
-       // Delete from Supabase
-       const { error: deleteError } = await supabase
-         .from('candidates')
-         .delete()
-         .eq('id', candidateId);
+        // Delete from Supabase
+        const { error: deleteError } = await supabase
+          .from('candidates')
+          .delete()
+          .eq('id', candidateId);
 
-       if (deleteError) {
-         console.error('Failed to delete candidate from Supabase:', deleteError);
-         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
-       }
-     } catch (error) {
-       console.error('Failed to delete candidate from Supabase:', error);
-       return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
-     }
+        if (deleteError) {
+          console.error('Failed to delete candidate from Supabase:', deleteError);
+          return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+        }
+      } catch (error) {
+        console.error('Failed to delete candidate from Supabase:', error);
+        return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+      }
     } else if (!candidate) {
-     return res.status(404).json({ success: false, message: 'Candidate not found' });
+      return res.status(404).json({ success: false, message: 'Candidate not found' });
     }
 
     if (candidateIndex !== -1) {
@@ -1589,7 +1605,7 @@ app.delete('/api/candidates/:id', async (req, res) => {
     deleteResumeFile(candidate?.resumeUrl);
 
     if (supabase) {
-     await refreshCandidatesFromDB();
+      await refreshCandidatesFromDB();
     }
 
     res.json({ success: true, message: 'Candidate removed' });
@@ -1800,14 +1816,14 @@ app.get('/api/analytics/employees', (req, res) => {
 
 app.get('/api/analytics/activities', (req, res) => {
   const recentActivities = [];
-  
+
   const now = new Date();
   const thisMonth = candidates.filter(c => {
     if (!c.createdAt) return false;
     const createdAt = new Date(c.createdAt);
     return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
   });
-  
+
   if (thisMonth.length > 0) {
     const latest = thisMonth.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
     recentActivities.push({
@@ -1817,7 +1833,7 @@ app.get('/api/analytics/activities', (req, res) => {
       type: 'candidate'
     });
   }
-  
+
   const recentProjects = projects.filter(p => p.progress > 0 && p.progress < 100).slice(0, 2);
   if (recentProjects.length > 0) {
     recentActivities.push({
@@ -1827,7 +1843,7 @@ app.get('/api/analytics/activities', (req, res) => {
       type: 'project'
     });
   }
-  
+
   const shortlistedCandidates = candidates.filter(c => c.status === 'shortlisted');
   if (shortlistedCandidates.length > 0) {
     recentActivities.push({
@@ -1837,7 +1853,7 @@ app.get('/api/analytics/activities', (req, res) => {
       type: 'offer'
     });
   }
-  
+
   if (employees.length > 0) {
     const recentEmployee = employees[Math.floor(Math.random() * Math.min(5, employees.length))];
     recentActivities.push({
@@ -1847,7 +1863,7 @@ app.get('/api/analytics/activities', (req, res) => {
       type: 'employee'
     });
   }
-  
+
   if (salaryPredictions.length > 0) {
     recentActivities.push({
       id: `act-sal-${salaryPredictions[0].id}`,
@@ -1863,7 +1879,7 @@ app.get('/api/analytics/activities', (req, res) => {
       type: 'salary'
     });
   }
-  
+
   res.json({ success: true, data: recentActivities.slice(0, 5) });
 });
 
@@ -1872,23 +1888,23 @@ app.get('/api/analytics/salary-expenses', (req, res) => {
   const totalEmployees = employees.length;
   const now = new Date();
   const currentMonth = now.getMonth();
-  
+
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const salaryData = [];
-  
+
   for (let i = 5; i >= 0; i--) {
     const monthIndex = (currentMonth - i + 12) % 12;
     const baseAmount = totalEmployees * avgSalaryPerEmployee;
     const growthFactor = 1 + (5 - i) * 0.025;
     const randomVariation = 0.98 + Math.random() * 0.04;
     const amount = Math.round(baseAmount * growthFactor * randomVariation);
-    
+
     salaryData.push({
       month: monthNames[monthIndex],
       amount
     });
   }
-  
+
   res.json({ success: true, data: salaryData });
 });
 
@@ -1980,16 +1996,16 @@ const calculateMatchScore = (candidate, searchFilters) => {
   let score = 0;
   const candidateSkills = candidate.skills.map(s => s.toLowerCase());
   const requiredSkills = searchFilters.skills.map(s => s.toLowerCase());
-  
+
   if (requiredSkills.length > 0) {
-    const matchedSkills = requiredSkills.filter(skill => 
+    const matchedSkills = requiredSkills.filter(skill =>
       candidateSkills.some(cs => cs.includes(skill) || skill.includes(cs))
     );
     score += (matchedSkills.length / requiredSkills.length) * 70;
   } else {
     score += 50;
   }
-  
+
   const expMin = searchFilters.experience.min;
   const expMax = searchFilters.experience.max;
   if (candidate.experience >= expMin && candidate.experience <= expMax) {
@@ -1997,7 +2013,7 @@ const calculateMatchScore = (candidate, searchFilters) => {
   } else if (candidate.experience >= expMin - 1 && candidate.experience <= expMax + 1) {
     score += 15;
   }
-  
+
   if (searchFilters.location && candidate.location.toLowerCase().includes(searchFilters.location.toLowerCase())) {
     score += 10;
   }
@@ -2015,7 +2031,7 @@ const calculateMatchScore = (candidate, searchFilters) => {
   if (keywordMatches > 0) {
     score += Math.min(15, keywordMatches * 3);
   }
-  
+
   return Math.min(Math.round(score), 100);
 };
 
@@ -2030,25 +2046,25 @@ app.post('/api/talent-scout/search', async (req, res) => {
       skills = [],
       platform = 'both'
     } = req.body;
-    
+
     if (!keywords || !keywords.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Keywords are required for searching' 
+      return res.status(400).json({
+        success: false,
+        message: 'Keywords are required for searching'
       });
     }
-    
+
     const experienceRange = experience && typeof experience === 'object'
       ? {
-          min: typeof experience.min === 'number' ? experience.min : 0,
-          max: typeof experience.max === 'number' ? experience.max : 15
-        }
+        min: typeof experience.min === 'number' ? experience.min : 0,
+        max: typeof experience.max === 'number' ? experience.max : 15
+      }
       : { min: 0, max: 15 };
-    
+
     const normalizedPlatform = typeof platform === 'string' ? platform.toLowerCase() : 'both';
     const allowedPlatforms = ['linkedin', 'naukri', 'both'];
     const selectedPlatform = allowedPlatforms.includes(normalizedPlatform) ? normalizedPlatform : 'both';
-    
+
     const filters = {
       keywords: keywords.trim(),
       location: location || '',
@@ -2056,14 +2072,14 @@ app.post('/api/talent-scout/search', async (req, res) => {
       skills: Array.isArray(skills) ? skills : [],
       platform: selectedPlatform
     };
-    
+
     console.log(`[Talent Scout] Searching with HR-provided keywords: "${filters.keywords}"`);
     console.log(`[Talent Scout] Platform filter: ${filters.platform}`);
-    
+
     await refreshCandidatesFromDB();
-    
+
     let filteredResults = [];
-    
+
     // Search LinkedIn profiles when platform includes LinkedIn
     if (selectedPlatform === 'linkedin' || selectedPlatform === 'both') {
       console.log('[Talent Scout] Fetching profiles from LinkedIn...');
@@ -2085,20 +2101,20 @@ app.post('/api/talent-scout/search', async (req, res) => {
       }
 
       const keywordLower = filters.keywords.toLowerCase();
-      const keywordMatch = 
+      const keywordMatch =
         candidate.name.toLowerCase().includes(keywordLower) ||
         (candidate.domain && candidate.domain.toLowerCase().includes(keywordLower)) ||
         (candidate.currentRole && candidate.currentRole.toLowerCase().includes(keywordLower)) ||
         (candidate.bio && candidate.bio.toLowerCase().includes(keywordLower)) ||
         (candidate.skills && candidate.skills.some(skill => skill.toLowerCase().includes(keywordLower)));
-      
+
       if (!keywordMatch) return false;
-      
+
       if (filters.location && filters.location.trim()) {
         const locationMatch = candidate.location && candidate.location.toLowerCase().includes(filters.location.toLowerCase());
         if (!locationMatch) return false;
       }
-      
+
       const candidateExperience = typeof candidate.experience === 'number'
         ? candidate.experience
         : Number.parseFloat(candidate.experience) || 0;
@@ -2106,31 +2122,31 @@ app.post('/api/talent-scout/search', async (req, res) => {
       if (candidateExperience < filters.experience.min || candidateExperience > filters.experience.max) {
         return false;
       }
-      
+
       if (filters.skills.length > 0) {
         const candidateSkills = candidate.skills || [];
         const candidateSkillsLower = candidateSkills.map(s => s.toLowerCase());
-        const hasRequiredSkills = filters.skills.some(reqSkill => 
-          candidateSkillsLower.some(candidateSkill => 
+        const hasRequiredSkills = filters.skills.some(reqSkill =>
+          candidateSkillsLower.some(candidateSkill =>
             candidateSkill.includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(candidateSkill)
           )
         );
         if (!hasRequiredSkills) return false;
       }
-      
+
       return true;
     });
-    
+
     const convertedCandidates = candidateResults.map(convertCandidateToTalentScoutProfile);
     filteredResults = [...filteredResults, ...convertedCandidates];
-    
+
     // Calculate match scores for all results
     filteredResults = filteredResults.map(profile => {
       const profileWithScore = { ...profile };
       profileWithScore.matchScore = calculateMatchScore(profileWithScore, filters);
       return profileWithScore;
     });
-    
+
     // Remove duplicates based on email (in case there are overlaps)
     const uniqueResults = [];
     const seenEmails = new Set();
@@ -2140,14 +2156,14 @@ app.post('/api/talent-scout/search', async (req, res) => {
         uniqueResults.push(profile);
       }
     });
-    
+
     // Sort by match score
     uniqueResults.sort((a, b) => b.matchScore - a.matchScore);
-    
+
     console.log(`[Talent Scout] Found ${uniqueResults.length} candidates matching HR keywords`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       data: uniqueResults,
       meta: {
         searchKeywords: filters.keywords,
@@ -2158,9 +2174,9 @@ app.post('/api/talent-scout/search', async (req, res) => {
     });
   } catch (error) {
     console.error('Talent scout search error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to search candidates' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search candidates'
     });
   }
 });
@@ -2185,10 +2201,10 @@ app.get('/api/talent-scout/candidates', async (req, res) => {
 
 app.get('/api/talent-scout/linkedin-status', (req, res) => {
   const status = getConfigurationStatus();
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     data: status,
-    message: status.configured 
+    message: status.configured
       ? 'LinkedIn integration is configured and active'
       : 'LinkedIn integration not configured. Set LINKEDIN_API_KEY and enable LINKEDIN_INTEGRATION_ENABLED in .env to connect to LinkedIn API. Currently showing candidates from your database.'
   });
@@ -2197,7 +2213,7 @@ app.get('/api/talent-scout/linkedin-status', (req, res) => {
 app.post('/api/talent-scout/invite', async (req, res) => {
   try {
     const { candidateId, message } = req.body;
-    
+
     await refreshCandidatesFromDB();
 
     const candidateIndex = candidates.findIndex(candidate => candidate.id === candidateId);
@@ -2250,17 +2266,17 @@ app.post('/api/talent-scout/invite', async (req, res) => {
       read: false,
       timestamp: new Date()
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Successfully contacted ${updatedCandidate.name}`,
       data: talentScoutProfile
     });
   } catch (error) {
     console.error('Talent scout invite error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to send invitation' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send invitation'
     });
   }
 });
@@ -2340,9 +2356,9 @@ app.post('/api/talent-scout/upload', upload.array('resumes', 10), async (req, re
     res.json({ success: true, data: parsedProfiles, message: `Successfully uploaded ${parsedProfiles.length} profile(s)` });
   } catch (error) {
     console.error('Error uploading employee profiles:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to upload employee profiles' 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload employee profiles'
     });
   }
 });
