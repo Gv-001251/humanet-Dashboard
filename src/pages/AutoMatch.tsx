@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/common/Button';
 import { 
@@ -9,6 +9,7 @@ import {
   Briefcase,
   CheckCircle
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 interface Employee {
   id: string;
@@ -24,43 +25,10 @@ interface MatchedEmployee extends Employee {
   matchedSkills: string[];
 }
 
-const INTERNAL_EMPLOYEES: Employee[] = [
-  {
-    id: 'emp-1',
-    name: 'Anjali Sharma',
-    role: 'Senior Frontend Engineer',
-    resumeSummary: 'Experienced frontend developer with 5+ years building scalable React applications, implementing design systems, and leading UI/UX initiatives. Strong track record of delivering high-quality web applications.',
-    skills: ['React', 'TypeScript', 'JavaScript', 'CSS', 'HTML', 'Redux', 'GraphQL', 'UI/UX Design', 'Responsive Design', 'Performance Optimization']
-  },
-  {
-    id: 'emp-2',
-    name: 'Rahul Verma',
-    role: 'Full Stack Developer',
-    resumeSummary: 'Full-stack engineer with expertise in Node.js, Express, and MongoDB. Built multiple REST APIs and microservices. Strong problem-solving skills and experience with cloud deployment on AWS.',
-    skills: ['Node.js', 'Express', 'MongoDB', 'REST APIs', 'AWS', 'Docker', 'JavaScript', 'React', 'PostgreSQL', 'Microservices']
-  },
-  {
-    id: 'emp-3',
-    name: 'Priya Singh',
-    role: 'Backend Engineer',
-    resumeSummary: 'Backend specialist focused on building robust server-side applications with Python and Node.js. Experience with database optimization, API design, and system architecture for high-traffic applications.',
-    skills: ['Python', 'Django', 'Node.js', 'PostgreSQL', 'Redis', 'API Design', 'System Architecture', 'Database Optimization', 'Docker', 'Kubernetes']
-  },
-  {
-    id: 'emp-4',
-    name: 'Vikram Patel',
-    role: 'UI/UX Designer & Developer',
-    resumeSummary: 'Creative designer-developer hybrid specializing in user interface design and frontend implementation. Expert in Figma, design systems, and crafting delightful user experiences with modern web technologies.',
-    skills: ['Figma', 'UI/UX Design', 'React', 'CSS', 'HTML', 'Design Systems', 'Prototyping', 'User Research', 'Accessibility', 'Animation']
-  },
-  {
-    id: 'emp-5',
-    name: 'Meera Kapoor',
-    role: 'DevOps Engineer',
-    resumeSummary: 'DevOps engineer with strong background in CI/CD pipelines, cloud infrastructure, and automation. Experienced in managing Kubernetes clusters, implementing monitoring solutions, and optimizing deployment workflows.',
-    skills: ['Kubernetes', 'Docker', 'AWS', 'CI/CD', 'Jenkins', 'Terraform', 'Monitoring', 'Linux', 'Bash Scripting', 'Infrastructure as Code']
-  }
-];
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const AutoMatch: React.FC = () => {
   const [projectTitle, setProjectTitle] = useState('');
@@ -68,6 +36,121 @@ export const AutoMatch: React.FC = () => {
   const [requiredSkills, setRequiredSkills] = useState('');
   const [matchedEmployees, setMatchedEmployees] = useState<MatchedEmployee[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { data, error } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('status', 'active');
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          const formattedEmployees = data.map(emp => ({
+            id: emp.id || emp.employee_id,
+            name: emp.name || 'Unknown Employee',
+            role: emp.role || emp.position || 'Unknown Role',
+            resumeSummary: emp.resume_summary || emp.bio || 'No summary available',
+            skills: emp.skills ? (Array.isArray(emp.skills) ? emp.skills : [emp.skills]) : []
+          }));
+          setEmployees(formattedEmployees);
+        } else {
+          // Fallback to hardcoded data if no employees in database
+          setEmployees([
+            {
+              id: 'emp-1',
+              name: 'Anjali Sharma',
+              role: 'Senior Frontend Engineer',
+              resumeSummary: 'Experienced frontend developer with 5+ years building scalable React applications, implementing design systems, and leading UI/UX initiatives. Strong track record of delivering high-quality web applications.',
+              skills: ['React', 'TypeScript', 'JavaScript', 'CSS', 'HTML', 'Redux', 'GraphQL', 'UI/UX Design', 'Responsive Design', 'Performance Optimization']
+            },
+            {
+              id: 'emp-2',
+              name: 'Rahul Verma',
+              role: 'Full Stack Developer',
+              resumeSummary: 'Full-stack engineer with expertise in Node.js, Express, and MongoDB. Built multiple REST APIs and microservices. Strong problem-solving skills and experience with cloud deployment on AWS.',
+              skills: ['Node.js', 'Express', 'MongoDB', 'REST APIs', 'AWS', 'Docker', 'JavaScript', 'React', 'PostgreSQL', 'Microservices']
+            },
+            {
+              id: 'emp-3',
+              name: 'Priya Singh',
+              role: 'Backend Engineer',
+              resumeSummary: 'Backend specialist focused on building robust server-side applications with Python and Node.js. Experience with database optimization, API design, and system architecture for high-traffic applications.',
+              skills: ['Python', 'Django', 'Node.js', 'PostgreSQL', 'Redis', 'API Design', 'System Architecture', 'Database Optimization', 'Docker', 'Kubernetes']
+            },
+            {
+              id: 'emp-4',
+              name: 'Vikram Patel',
+              role: 'UI/UX Designer & Developer',
+              resumeSummary: 'Creative designer-developer hybrid specializing in user interface design and frontend implementation. Expert in Figma, design systems, and crafting delightful user experiences with modern web technologies.',
+              skills: ['Figma', 'UI/UX Design', 'React', 'CSS', 'HTML', 'Design Systems', 'Prototyping', 'User Research', 'Accessibility', 'Animation']
+            },
+            {
+              id: 'emp-5',
+              name: 'Meera Kapoor',
+              role: 'DevOps Engineer',
+              resumeSummary: 'DevOps engineer with strong background in CI/CD pipelines, cloud infrastructure, and automation. Experienced in managing Kubernetes clusters, implementing monitoring solutions, and optimizing deployment workflows.',
+              skills: ['Kubernetes', 'Docker', 'AWS', 'CI/CD', 'Jenkins', 'Terraform', 'Monitoring', 'Linux', 'Bash Scripting', 'Infrastructure as Code']
+            }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        setError('Failed to fetch employees. Using fallback data.');
+        setEmployees([
+          {
+            id: 'emp-1',
+            name: 'Anjali Sharma',
+            role: 'Senior Frontend Engineer',
+            resumeSummary: 'Experienced frontend developer with 5+ years building scalable React applications, implementing design systems, and leading UI/UX initiatives. Strong track record of delivering high-quality web applications.',
+            skills: ['React', 'TypeScript', 'JavaScript', 'CSS', 'HTML', 'Redux', 'GraphQL', 'UI/UX Design', 'Responsive Design', 'Performance Optimization']
+          },
+          {
+            id: 'emp-2',
+            name: 'Rahul Verma',
+            role: 'Full Stack Developer',
+            resumeSummary: 'Full-stack engineer with expertise in Node.js, Express, and MongoDB. Built multiple REST APIs and microservices. Strong problem-solving skills and experience with cloud deployment on AWS.',
+            skills: ['Node.js', 'Express', 'MongoDB', 'REST APIs', 'AWS', 'Docker', 'JavaScript', 'React', 'PostgreSQL', 'Microservices']
+          },
+          {
+            id: 'emp-3',
+            name: 'Priya Singh',
+            role: 'Backend Engineer',
+            resumeSummary: 'Backend specialist focused on building robust server-side applications with Python and Node.js. Experience with database optimization, API design, and system architecture for high-traffic applications.',
+            skills: ['Python', 'Django', 'Node.js', 'PostgreSQL', 'Redis', 'API Design', 'System Architecture', 'Database Optimization', 'Docker', 'Kubernetes']
+          },
+          {
+            id: 'emp-4',
+            name: 'Vikram Patel',
+            role: 'UI/UX Designer & Developer',
+            resumeSummary: 'Creative designer-developer hybrid specializing in user interface design and frontend implementation. Expert in Figma, design systems, and crafting delightful user experiences with modern web technologies.',
+            skills: ['Figma', 'UI/UX Design', 'React', 'CSS', 'HTML', 'Design Systems', 'Prototyping', 'User Research', 'Accessibility', 'Animation']
+          },
+          {
+            id: 'emp-5',
+            name: 'Meera Kapoor',
+            role: 'DevOps Engineer',
+            resumeSummary: 'DevOps engineer with strong background in CI/CD pipelines, cloud infrastructure, and automation. Experienced in managing Kubernetes clusters, implementing monitoring solutions, and optimizing deployment workflows.',
+            skills: ['Kubernetes', 'Docker', 'AWS', 'CI/CD', 'Jenkins', 'Terraform', 'Monitoring', 'Linux', 'Bash Scripting', 'Infrastructure as Code']
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
 
   const calculateMatchScore = (employee: Employee, projectSkills: string[], projectDesc: string): MatchedEmployee => {
     const skillsArray = projectSkills.map(s => s.toLowerCase().trim());
@@ -121,7 +204,7 @@ export const AutoMatch: React.FC = () => {
     
     const skillsArray = requiredSkills.split(',').map(s => s.trim()).filter(Boolean);
     
-    const matches = INTERNAL_EMPLOYEES
+    const matches = employees
       .map(employee => calculateMatchScore(employee, skillsArray, projectDescription))
       .filter(match => match.matchScore > 0)
       .sort((a, b) => b.matchScore - a.matchScore);
@@ -173,7 +256,7 @@ export const AutoMatch: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-neutral-muted font-medium uppercase">Available Employees</p>
-                  <p className="text-2xl font-bold text-neutral-text mt-1">{INTERNAL_EMPLOYEES.length}</p>
+                  <p className="text-2xl font-bold text-neutral-text mt-1">{employees.length}</p>
                 </div>
                 <Users className="w-8 h-8 text-purple-500 opacity-20" />
               </div>
@@ -299,8 +382,7 @@ export const AutoMatch: React.FC = () => {
               <p className="text-sm text-neutral-subtler mt-1">
                 {hasSearched 
                   ? `Found ${matchedEmployees.length} ${matchedEmployees.length === 1 ? 'match' : 'matches'}`
-                  : 'Results will appear here after searching'
-                }
+                  : 'Results will appear here after searching'}
               </p>
             </div>
             
