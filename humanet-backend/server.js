@@ -7,7 +7,7 @@ const fs = require('fs');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
-const { connectDB } = require('./src/config/mongodb');
+const { createClient } = require('@supabase/supabase-js');
 const {
   predictSalary,
   getMarketComparison,
@@ -40,6 +40,19 @@ ensureUploadsDirExists();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  console.warn('Supabase credentials not found. Using in-memory storage for development.');
+}
+
+const supabase = supabaseUrl && supabaseServiceRoleKey 
+  ? createClient(supabaseUrl, supabaseServiceRoleKey)
+  : null;
 
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -136,15 +149,25 @@ const mapCandidateDocument = (doc) => {
 };
 
 const refreshCandidatesFromDB = async () => {
-  if (!candidateCollection) {
+  if (!supabase) {
     return candidates;
   }
 
   try {
-    const docs = await candidateCollection.find({}, { projection: { _id: 0 } }).toArray();
-    candidates = docs.map(mapCandidateDocument).filter(Boolean);
+    const { data: docs, error } = await supabase
+      .from('candidates')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    if (docs) {
+      candidates = docs.map(mapCandidateDocument).filter(Boolean);
+    }
   } catch (error) {
-    console.error('Failed to refresh candidates from MongoDB:', error);
+    console.error('Failed to refresh candidates from Supabase:', error);
   }
 
   return candidates;
@@ -152,31 +175,51 @@ const refreshCandidatesFromDB = async () => {
 
 const initializeDatabase = async () => {
   try {
-    const db = await connectDB();
-
-    if (!db) {
+    if (!supabase) {
+      console.log('Using in-memory storage for development (no Supabase connection)');
       return;
     }
 
-    candidateCollection = db.collection('candidates');
-    await candidateCollection.createIndex({ id: 1 }, { unique: true });
+    // Check if candidates table exists and has data
+    const { data: existingCandidates, error } = await supabase
+      .from('candidates')
+      .select('*')
+      .limit(1);
 
-    const existingCandidates = await candidateCollection.find({}, { projection: { _id: 0 } }).toArray();
+    if (error) {
+      console.error('Error checking candidates table:', error);
+      return;
+    }
 
-    if (existingCandidates.length > 0) {
-      candidates = existingCandidates.map(mapCandidateDocument).filter(Boolean);
+    if (existingCandidates && existingCandidates.length > 0) {
+      // Load all candidates from Supabase
+      const { data: allCandidates } = await supabase
+        .from('candidates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (allCandidates) {
+        candidates = allCandidates.map(candidate => mapCandidateDocument(candidate)).filter(Boolean);
+      }
     } else if (candidates.length > 0) {
+      // Seed initial data if table is empty
       const documents = candidates.map(candidate => normalizeCandidate(candidate)).filter(Boolean);
       if (documents.length > 0) {
-        await candidateCollection.insertMany(documents, { ordered: false });
-        candidates = documents.map(candidate => ({ ...candidate }));
+        const { error: insertError } = await supabase
+          .from('candidates')
+          .insert(documents);
+
+        if (insertError) {
+          console.error('Error seeding initial candidates:', insertError);
+        } else {
+          candidates = documents.map(candidate => ({ ...candidate }));
+        }
       }
     }
 
-    console.log(`Candidate collection initialized with ${candidates.length} records.`);
+    console.log(`Database initialized with ${candidates.length} candidate records.`);
   } catch (error) {
     console.error('Failed to initialize database:', error);
-    candidateCollection = null;
   }
 };
 
@@ -1283,11 +1326,44 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
 
         const normalizedCandidate = normalizeCandidate(candidate);
 
-        if (candidateCollection && normalizedCandidate) {
+        if (supabase && normalizedCandidate) {
           try {
-            await candidateCollection.insertOne({ ...normalizedCandidate });
+            // Upload file to Supabase storage
+            const fileContent = fs.readFileSync(file.path);
+            const filePath = `resumes/${file.filename}`;
+            
+            const { data: uploadData, error: uploadError } = await supabase
+              .storage
+              .from('resumes')
+              .upload(filePath, fileContent, {
+                contentType: file.mimetype
+              });
+
+            if (uploadError) {
+              console.error('Failed to upload file to Supabase storage:', uploadError);
+            } else {
+              // Get public URL
+              const { data: publicUrlData } = supabase
+                .storage
+                .from('resumes')
+                .getPublicUrl(filePath);
+
+              // Save candidate data with resume URL
+              const candidateWithUrl = {
+                ...normalizedCandidate,
+                resume_url: publicUrlData.publicUrl
+              };
+
+              const { error: insertError } = await supabase
+                .from('candidates')
+                .insert(candidateWithUrl);
+
+              if (insertError) {
+                console.error('Failed to save candidate to Supabase:', insertError);
+              }
+            }
           } catch (error) {
-            console.error('Failed to save candidate to MongoDB:', error);
+            console.error('Failed to save candidate to Supabase:', error);
           }
         }
 
@@ -1296,7 +1372,7 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
       }
     }
 
-    if (candidateCollection && parsedCandidates.length > 0) {
+    if (supabase && parsedCandidates.length > 0) {
       await refreshCandidatesFromDB();
     }
 
@@ -1323,17 +1399,22 @@ app.get('/api/candidates/:id', async (req, res) => {
   try {
     let candidate = candidates.find(c => c.id === candidateId);
 
-    if (candidateCollection) {
-      const document = await candidateCollection.findOne({ id: candidateId }, { projection: { _id: 0 } });
-      if (document) {
-        candidate = mapCandidateDocument(document);
-        const existingIndex = candidates.findIndex(c => c.id === candidateId);
-        if (existingIndex !== -1) {
-          candidates[existingIndex] = candidate;
-        } else if (candidate) {
-          candidates.push(candidate);
-        }
-      }
+    if (supabase) {
+     const { data: document, error } = await supabase
+       .from('candidates')
+       .select('*')
+       .eq('id', candidateId)
+       .single();
+
+     if (!error && document) {
+       candidate = mapCandidateDocument(document);
+       const existingIndex = candidates.findIndex(c => c.id === candidateId);
+       if (existingIndex !== -1) {
+         candidates[existingIndex] = candidate;
+       } else if (candidate) {
+         candidates.push(candidate);
+       }
+     }
     }
 
     if (!candidate) {
@@ -1361,12 +1442,17 @@ app.put('/api/candidates/:id/status', async (req, res) => {
 
     let candidate = candidates.find(c => c.id === candidateId);
 
-    if (!candidate && candidateCollection) {
-      const existing = await candidateCollection.findOne({ id: candidateId }, { projection: { _id: 0 } });
-      if (existing) {
-        candidate = mapCandidateDocument(existing);
-        candidates.push(candidate);
-      }
+    if (!candidate && supabase) {
+     const { data: existing, error } = await supabase
+       .from('candidates')
+       .select('*')
+       .eq('id', candidateId)
+       .single();
+
+     if (!error && existing) {
+       candidate = mapCandidateDocument(existing);
+       candidates.push(candidate);
+     }
     }
 
     if (!candidate) {
@@ -1377,20 +1463,25 @@ app.put('/api/candidates/:id/status', async (req, res) => {
 
     candidate.status = normalizedStatus;
 
-    if (candidateCollection) {
-      try {
-        await candidateCollection.updateOne(
-          { id: candidateId },
-          { $set: { status: normalizedStatus } }
-        );
-        await refreshCandidatesFromDB();
-        const refreshedCandidate = candidates.find(c => c.id === candidateId);
-        if (refreshedCandidate) {
-          candidate = refreshedCandidate;
-        }
-      } catch (error) {
-        console.error('Failed to update candidate status in MongoDB:', error);
-      }
+    if (supabase) {
+     try {
+       const { error } = await supabase
+         .from('candidates')
+         .update({ status: normalizedStatus })
+         .eq('id', candidateId);
+
+       if (error) {
+         console.error('Failed to update candidate status in Supabase:', error);
+       } else {
+         await refreshCandidatesFromDB();
+         const refreshedCandidate = candidates.find(c => c.id === candidateId);
+         if (refreshedCandidate) {
+           candidate = refreshedCandidate;
+         }
+       }
+     } catch (error) {
+       console.error('Failed to update candidate status in Supabase:', error);
+     }
     }
 
     if (normalizedStatus === 'shortlisted' && previousStatus !== 'shortlisted') {
@@ -1463,20 +1554,44 @@ app.delete('/api/candidates/:id', async (req, res) => {
     let candidateIndex = candidates.findIndex(c => c.id === candidateId);
     let candidate = candidateIndex !== -1 ? candidates[candidateIndex] : null;
 
-    if (candidateCollection) {
-      try {
-        const deletion = await candidateCollection.findOneAndDelete({ id: candidateId }, { projection: { _id: 0 } });
-        if (deletion.value) {
-          candidate = mapCandidateDocument(deletion.value);
-        } else if (!candidate) {
-          return res.status(404).json({ success: false, message: 'Candidate not found' });
-        }
-      } catch (error) {
-        console.error('Failed to delete candidate from MongoDB:', error);
-        return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
-      }
+    if (supabase) {
+     try {
+       // First, get the candidate to check if it exists
+       const { data: existingCandidate, error: fetchError } = await supabase
+         .from('candidates')
+         .select('*')
+         .eq('id', candidateId)
+         .single();
+
+       if (fetchError) {
+         console.error('Failed to fetch candidate from Supabase:', fetchError);
+         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+       }
+
+       if (!existingCandidate && !candidate) {
+         return res.status(404).json({ success: false, message: 'Candidate not found' });
+       }
+
+       if (existingCandidate) {
+         candidate = mapCandidateDocument(existingCandidate);
+       }
+
+       // Delete from Supabase
+       const { error: deleteError } = await supabase
+         .from('candidates')
+         .delete()
+         .eq('id', candidateId);
+
+       if (deleteError) {
+         console.error('Failed to delete candidate from Supabase:', deleteError);
+         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+       }
+     } catch (error) {
+       console.error('Failed to delete candidate from Supabase:', error);
+       return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+     }
     } else if (!candidate) {
-      return res.status(404).json({ success: false, message: 'Candidate not found' });
+     return res.status(404).json({ success: false, message: 'Candidate not found' });
     }
 
     if (candidateIndex !== -1) {
@@ -1485,8 +1600,8 @@ app.delete('/api/candidates/:id', async (req, res) => {
 
     deleteResumeFile(candidate?.resumeUrl);
 
-    if (candidateCollection) {
-      await refreshCandidatesFromDB();
+    if (supabase) {
+     await refreshCandidatesFromDB();
     }
 
     res.json({ success: true, message: 'Candidate removed' });

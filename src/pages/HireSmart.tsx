@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Upload, FileText, CheckCircle, XCircle, Eye, Filter, Trash2, Search, X } from 'lucide-react';
 import { Button } from '../components/common/Button';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Candidate {
   id: string;
@@ -33,15 +39,17 @@ export const HireSmart: React.FC = () => {
 
   const fetchCandidates = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates`, {
-        credentials: 'include'
-      });
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) throw new Error('Failed to fetch candidates');
+      if (error) {
+        throw error;
+      }
 
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const parsedCandidates: Candidate[] = data.data.map((candidate: unknown): Candidate => {
+      if (data && Array.isArray(data)) {
+        const parsedCandidates: Candidate[] = data.map((candidate: unknown): Candidate => {
           const cand = candidate as Record<string, unknown>;
           return {
             id: String(cand.id ?? cand._id ?? `cand-${Date.now()}`),
@@ -70,43 +78,79 @@ export const HireSmart: React.FC = () => {
 
     setIsUploading(true);
 
-    const formData = new FormData();
-    Array.from(files).forEach(file => {
-      formData.append('resumes', file);
-    });
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
+      const newCandidates: Candidate[] = [];
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to upload resumes' }));
-        throw new Error(errorData.message || 'Failed to upload resumes');
+      for (const file of Array.from(files)) {
+        // Upload file to Supabase storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${file.name}`;
+        const filePath = `resumes/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('resumes')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw new Error(`Failed to upload file ${file.name}: ${uploadError.message}`);
+        }
+
+        // Get public URL for the uploaded file
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('resumes')
+          .getPublicUrl(filePath);
+
+        // Simulate AI analysis (in a real app, this would call an AI service)
+        const simulatedAnalysis = simulateAIAnalysis(file.name);
+
+        // Insert candidate data into database
+        const { data: candidateData, error: candidateError } = await supabase
+          .from('candidates')
+          .insert([{
+            name: simulatedAnalysis.name,
+            email: simulatedAnalysis.email,
+            phone: simulatedAnalysis.phone,
+            skills: simulatedAnalysis.extracted_skills,
+            experience: simulatedAnalysis.experience,
+            ctc: simulatedAnalysis.ctc,
+            location: simulatedAnalysis.location,
+            domain: simulatedAnalysis.domain,
+            status: 'pending',
+            education: simulatedAnalysis.education,
+            resume_url: publicUrlData.publicUrl,
+            extracted_skills: simulatedAnalysis.extracted_skills,
+            match_score: simulatedAnalysis.match_score,
+            analysis_report: simulatedAnalysis
+          }])
+          .select();
+
+        if (candidateError) {
+          throw new Error(`Failed to save candidate data: ${candidateError.message}`);
+        }
+
+        if (candidateData && candidateData.length > 0) {
+          const savedCandidate = candidateData[0];
+          newCandidates.push({
+            id: String(savedCandidate.id),
+            name: savedCandidate.name,
+            email: savedCandidate.email,
+            phone: savedCandidate.phone,
+            skills: savedCandidate.skills || [],
+            experience: savedCandidate.experience || 0,
+            ctc: savedCandidate.ctc || 0,
+            location: savedCandidate.location || 'Bangalore',
+            domain: savedCandidate.domain || 'General',
+            status: savedCandidate.status as 'pending' | 'shortlisted' | 'rejected' || 'pending',
+            education: savedCandidate.education || 'Not specified'
+          });
+        }
       }
 
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const parsedCandidates: Candidate[] = data.data.map((candidate: unknown): Candidate => {
-          const cand = candidate as Record<string, unknown>;
-          return {
-            id: String(cand.id ?? cand._id ?? `cand-${Date.now()}`),
-            name: String(cand.name ?? 'Unknown Candidate'),
-            email: String(cand.email ?? 'unknown@example.com'),
-            phone: String(cand.phone ?? '+91 9876543210'),
-            skills: Array.isArray(cand.skills) ? cand.skills as string[] : [],
-            experience: Number(cand.experience ?? cand.experience_years ?? 0),
-            ctc: Number(cand.ctc ?? cand.expected_ctc ?? 0),
-            location: String(cand.location ?? 'Bangalore'),
-            domain: String(cand.domain ?? 'General'),
-            status: (cand.status === 'shortlisted' || cand.status === 'rejected') ? cand.status as 'pending' | 'shortlisted' | 'rejected' : 'pending',
-            education: String(cand.education ?? 'Not specified')
-          };
-        });
-        setCandidates(prev => [...prev, ...parsedCandidates]);
-        alert(`Successfully uploaded ${parsedCandidates.length} resume(s)!`);
+      if (newCandidates.length > 0) {
+        setCandidates(prev => [...newCandidates, ...prev]);
+        alert(`Successfully uploaded ${newCandidates.length} resume(s)!`);
       }
     } catch (error) {
       console.error('Error uploading resumes:', error);
@@ -127,7 +171,7 @@ export const HireSmart: React.FC = () => {
         status: 'pending',
         education: 'B.Tech Computer Science'
       }));
-      setCandidates(prev => [...prev, ...mockCandidates]);
+      setCandidates(prev => [...mockCandidates, ...prev]);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -136,18 +180,55 @@ export const HireSmart: React.FC = () => {
     }
   };
 
+  // Helper function to simulate AI analysis
+  const simulateAIAnalysis = (fileName: string) => {
+    const domains = ['Frontend', 'Backend', 'Full Stack', 'Data Science', 'DevOps'];
+    const locations = ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Delhi'];
+    const educations = ['B.Tech Computer Science', 'M.Tech Data Science', 'B.E. Software Engineering', 'MCA'];
+    
+    const domain = domains[Math.floor(Math.random() * domains.length)];
+    const location = locations[Math.floor(Math.random() * locations.length)];
+    const education = educations[Math.floor(Math.random() * educations.length)];
+    
+    // Generate skills based on domain
+    const allSkills = [
+      'React', 'TypeScript', 'JavaScript', 'Node.js', 'MongoDB', 'Python', 'Django', 
+      'AWS', 'Docker', 'Kubernetes', 'TensorFlow', 'Machine Learning', 'PostgreSQL',
+      'Express', 'GraphQL', 'Redux', 'Vue.js', 'Angular', 'Java', 'Spring Boot'
+    ];
+    
+    const extractedSkills = allSkills.sort(() => 0.5 - Math.random()).slice(0, 3 + Math.floor(Math.random() * 5));
+    
+    return {
+      name: `Candidate ${fileName.split('-')[0] || 'Unknown'}`,
+      email: `candidate_${Date.now()}@example.com`,
+      phone: `+91 98765${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`,
+      extracted_skills: extractedSkills,
+      experience: 1 + Math.floor(Math.random() * 10),
+      ctc: 500000 + Math.floor(Math.random() * 1500000),
+      location: location,
+      domain: domain,
+      education: education,
+      match_score: 50 + Math.floor(Math.random() * 50),
+      analysis_report: {
+        skills: extractedSkills,
+        experience_years: 1 + Math.floor(Math.random() * 10),
+        education: education,
+        domain: domain
+      }
+    };
+  };
+
   const handleStatusUpdate = async (candidateId: string, newStatus: 'shortlisted' | 'rejected') => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus })
-      });
+      const { error } = await supabase
+        .from('candidates')
+        .update({ status: newStatus })
+        .eq('id', candidateId);
 
-      if (!response.ok) throw new Error('Failed to update status');
+      if (error) {
+        throw error;
+      }
 
       setCandidates(prev =>
         prev.map(c => (c.id === candidateId ? { ...c, status: newStatus } : c))
@@ -165,12 +246,41 @@ export const HireSmart: React.FC = () => {
 
     setDeletingCandidateId(candidateId);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+      // First, get the candidate to find their resume URL
+      const { data: candidateData, error: fetchError } = await supabase
+        .from('candidates')
+        .select('resume_url')
+        .eq('id', candidateId)
+        .single();
 
-      if (!response.ok) throw new Error('Failed to delete candidate');
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Delete the candidate record
+      const { error: deleteError } = await supabase
+        .from('candidates')
+        .delete()
+        .eq('id', candidateId);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // If there's a resume URL, delete the file from storage
+      if (candidateData?.resume_url) {
+        const filePath = candidateData.resume_url.split('/resumes/')[1];
+        if (filePath) {
+          const { error: storageError } = await supabase
+            .storage
+            .from('resumes')
+            .remove([filePath]);
+
+          if (storageError) {
+            console.warn('Failed to delete resume file:', storageError);
+          }
+        }
+      }
 
       setCandidates(prev => prev.filter(c => c.id !== candidateId));
       if (selectedCandidate?.id === candidateId) {
@@ -195,15 +305,43 @@ export const HireSmart: React.FC = () => {
 
     for (const candidateId of candidateIds) {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/candidates/${candidateId}`, {
-          method: 'DELETE'
-        });
+        // First, get the candidate to find their resume URL
+        const { data: candidateData, error: fetchError } = await supabase
+          .from('candidates')
+          .select('resume_url')
+          .eq('id', candidateId)
+          .single();
 
-        if (response.ok) {
-          successCount++;
-        } else {
-          failCount++;
+        if (fetchError) {
+          throw fetchError;
         }
+
+        // Delete the candidate record
+        const { error: deleteError } = await supabase
+          .from('candidates')
+          .delete()
+          .eq('id', candidateId);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+
+        // If there's a resume URL, delete the file from storage
+        if (candidateData?.resume_url) {
+          const filePath = candidateData.resume_url.split('/resumes/')[1];
+          if (filePath) {
+            const { error: storageError } = await supabase
+              .storage
+              .from('resumes')
+              .remove([filePath]);
+
+            if (storageError) {
+              console.warn('Failed to delete resume file:', storageError);
+            }
+          }
+        }
+
+        successCount++;
       } catch (error) {
         console.error('Error deleting candidate:', error);
         failCount++;
