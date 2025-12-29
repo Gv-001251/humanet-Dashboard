@@ -7,7 +7,7 @@ const fs = require('fs');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
-const { getSupabase, initSupabase } = require('./src/config/supabase');
+const { createClient } = require('@supabase/supabase-js');
 const {
   predictSalary,
   getMarketComparison,
@@ -40,6 +40,19 @@ ensureUploadsDirExists();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  console.warn('Supabase credentials not found. Using in-memory storage for development.');
+}
+
+const supabase = supabaseUrl && supabaseServiceRoleKey 
+  ? createClient(supabaseUrl, supabaseServiceRoleKey)
+  : null;
 
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -114,13 +127,15 @@ let candidates = [
   }
 ];
 
+let candidateCollection = null;
+
 const normalizeCandidate = (candidate) => {
   if (!candidate) {
     return null;
   }
 
   const normalized = { ...candidate };
-  normalized.createdAt = candidate?.createdAt ? new Date(candidate.createdAt).toISOString() : new Date().toISOString();
+  normalized.createdAt = candidate?.createdAt ? new Date(candidate.createdAt) : new Date();
   return normalized;
 };
 
@@ -129,26 +144,28 @@ const mapCandidateDocument = (doc) => {
     return null;
   }
 
-  return doc;
+  const { _id, ...rest } = doc;
+  return normalizeCandidate(rest);
 };
 
 const refreshCandidatesFromDB = async () => {
-  try {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return candidates;
-    }
+  if (!supabase) {
+    return candidates;
+  }
 
+  try {
     const { data: docs, error } = await supabase
       .from('candidates')
-      .select('*');
-    
+      .select('*')
+      .order('created_at', { ascending: false });
+
     if (error) {
-      console.error('Failed to refresh candidates from Supabase:', error);
-      return candidates;
+      throw error;
     }
 
-    candidates = docs || [];
+    if (docs) {
+      candidates = docs.map(mapCandidateDocument).filter(Boolean);
+    }
   } catch (error) {
     console.error('Failed to refresh candidates from Supabase:', error);
   }
@@ -158,36 +175,49 @@ const refreshCandidatesFromDB = async () => {
 
 const initializeDatabase = async () => {
   try {
-    initSupabase();
-
-    const supabase = getSupabase();
     if (!supabase) {
-      console.error('Failed to initialize Supabase');
+      console.log('Using in-memory storage for development (no Supabase connection)');
       return;
     }
 
+    // Check if candidates table exists and has data
     const { data: existingCandidates, error } = await supabase
       .from('candidates')
-      .select('*');
+      .select('*')
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Failed to fetch candidates:', error);
+    if (error) {
+      console.error('Error checking candidates table:', error);
       return;
     }
 
     if (existingCandidates && existingCandidates.length > 0) {
-      candidates = existingCandidates;
-    } else if (candidates.length > 0) {
-      const { error: insertError } = await supabase
+      // Load all candidates from Supabase
+      const { data: allCandidates } = await supabase
         .from('candidates')
-        .insert(candidates);
-      
-      if (insertError) {
-        console.error('Failed to insert initial candidates:', insertError);
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (allCandidates) {
+        candidates = allCandidates.map(candidate => mapCandidateDocument(candidate)).filter(Boolean);
+      }
+    } else if (candidates.length > 0) {
+      // Seed initial data if table is empty
+      const documents = candidates.map(candidate => normalizeCandidate(candidate)).filter(Boolean);
+      if (documents.length > 0) {
+        const { error: insertError } = await supabase
+          .from('candidates')
+          .insert(documents);
+
+        if (insertError) {
+          console.error('Error seeding initial candidates:', insertError);
+        } else {
+          candidates = documents.map(candidate => ({ ...candidate }));
+        }
       }
     }
 
-    console.log(`Candidate table initialized with ${candidates.length} records.`);
+    console.log(`Database initialized with ${candidates.length} candidate records.`);
   } catch (error) {
     console.error('Failed to initialize database:', error);
   }
@@ -1258,15 +1288,12 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
 
             const normalizedCandidate = normalizeCandidate(candidate);
 
-            try {
-              const supabase = getSupabase();
-              if (supabase) {
-                await supabase
-                  .from('candidates')
-                  .insert([normalizedCandidate]);
+            if (candidateCollection && normalizedCandidate) {
+              try {
+                await candidateCollection.insertOne({ ...normalizedCandidate });
+              } catch (error) {
+                console.error('Failed to save candidate to MongoDB:', error);
               }
-            } catch (error) {
-              console.error('Failed to save candidate to Supabase:', error);
             }
 
             candidates.push(normalizedCandidate);
@@ -1299,15 +1326,45 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
 
         const normalizedCandidate = normalizeCandidate(candidate);
 
-        try {
-          const supabase = getSupabase();
-          if (supabase) {
-            await supabase
-              .from('candidates')
-              .insert([normalizedCandidate]);
+        if (supabase && normalizedCandidate) {
+          try {
+            // Upload file to Supabase storage
+            const fileContent = fs.readFileSync(file.path);
+            const filePath = `resumes/${file.filename}`;
+            
+            const { data: uploadData, error: uploadError } = await supabase
+              .storage
+              .from('resumes')
+              .upload(filePath, fileContent, {
+                contentType: file.mimetype
+              });
+
+            if (uploadError) {
+              console.error('Failed to upload file to Supabase storage:', uploadError);
+            } else {
+              // Get public URL
+              const { data: publicUrlData } = supabase
+                .storage
+                .from('resumes')
+                .getPublicUrl(filePath);
+
+              // Save candidate data with resume URL
+              const candidateWithUrl = {
+                ...normalizedCandidate,
+                resume_url: publicUrlData.publicUrl
+              };
+
+              const { error: insertError } = await supabase
+                .from('candidates')
+                .insert(candidateWithUrl);
+
+              if (insertError) {
+                console.error('Failed to save candidate to Supabase:', insertError);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to save candidate to Supabase:', error);
           }
-        } catch (error) {
-          console.error('Failed to save candidate to Supabase:', error);
         }
 
         candidates.push(normalizedCandidate);
@@ -1315,7 +1372,7 @@ app.post('/api/candidates/upload', upload.array('resumes', 10), async (req, res)
       }
     }
 
-    if (candidateCollection && parsedCandidates.length > 0) {
+    if (supabase && parsedCandidates.length > 0) {
       await refreshCandidatesFromDB();
     }
 
@@ -1342,27 +1399,22 @@ app.get('/api/candidates/:id', async (req, res) => {
   try {
     let candidate = candidates.find(c => c.id === candidateId);
 
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        const { data: document, error } = await supabase
-          .from('candidates')
-          .select('*')
-          .eq('id', candidateId)
-          .single();
-        
-        if (!error && document) {
-          candidate = mapCandidateDocument(document);
-          const existingIndex = candidates.findIndex(c => c.id === candidateId);
-          if (existingIndex !== -1) {
-            candidates[existingIndex] = candidate;
-          } else if (candidate) {
-            candidates.push(candidate);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch candidate from Supabase:', error);
+    if (supabase) {
+     const { data: document, error } = await supabase
+       .from('candidates')
+       .select('*')
+       .eq('id', candidateId)
+       .single();
+
+     if (!error && document) {
+       candidate = mapCandidateDocument(document);
+       const existingIndex = candidates.findIndex(c => c.id === candidateId);
+       if (existingIndex !== -1) {
+         candidates[existingIndex] = candidate;
+       } else if (candidate) {
+         candidates.push(candidate);
+       }
+     }
     }
 
     if (!candidate) {
@@ -1390,24 +1442,17 @@ app.put('/api/candidates/:id/status', async (req, res) => {
 
     let candidate = candidates.find(c => c.id === candidateId);
 
-    if (!candidate) {
-      try {
-        const supabase = getSupabase();
-        if (supabase) {
-          const { data: existing, error } = await supabase
-            .from('candidates')
-            .select('*')
-            .eq('id', candidateId)
-            .single();
-          
-          if (!error && existing) {
-            candidate = mapCandidateDocument(existing);
-            candidates.push(candidate);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch candidate from Supabase:', error);
-      }
+    if (!candidate && supabase) {
+     const { data: existing, error } = await supabase
+       .from('candidates')
+       .select('*')
+       .eq('id', candidateId)
+       .single();
+
+     if (!error && existing) {
+       candidate = mapCandidateDocument(existing);
+       candidates.push(candidate);
+     }
     }
 
     if (!candidate) {
@@ -1418,22 +1463,25 @@ app.put('/api/candidates/:id/status', async (req, res) => {
 
     candidate.status = normalizedStatus;
 
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        await supabase
-          .from('candidates')
-          .update({ status: normalizedStatus })
-          .eq('id', candidateId);
-        
-        await refreshCandidatesFromDB();
-        const refreshedCandidate = candidates.find(c => c.id === candidateId);
-        if (refreshedCandidate) {
-          candidate = refreshedCandidate;
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update candidate status in Supabase:', error);
+    if (supabase) {
+     try {
+       const { error } = await supabase
+         .from('candidates')
+         .update({ status: normalizedStatus })
+         .eq('id', candidateId);
+
+       if (error) {
+         console.error('Failed to update candidate status in Supabase:', error);
+       } else {
+         await refreshCandidatesFromDB();
+         const refreshedCandidate = candidates.find(c => c.id === candidateId);
+         if (refreshedCandidate) {
+           candidate = refreshedCandidate;
+         }
+       }
+     } catch (error) {
+       console.error('Failed to update candidate status in Supabase:', error);
+     }
     }
 
     if (normalizedStatus === 'shortlisted' && previousStatus !== 'shortlisted') {
@@ -1506,24 +1554,44 @@ app.delete('/api/candidates/:id', async (req, res) => {
     let candidateIndex = candidates.findIndex(c => c.id === candidateId);
     let candidate = candidateIndex !== -1 ? candidates[candidateIndex] : null;
 
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        const { data: deletion, error } = await supabase
-          .from('candidates')
-          .delete()
-          .eq('id', candidateId)
-          .select();
-        
-        if (!error && deletion && deletion.length > 0) {
-          candidate = mapCandidateDocument(deletion[0]);
-        } else if (!candidate) {
-          return res.status(404).json({ success: false, message: 'Candidate not found' });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to delete candidate from Supabase:', error);
-      return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+    if (supabase) {
+     try {
+       // First, get the candidate to check if it exists
+       const { data: existingCandidate, error: fetchError } = await supabase
+         .from('candidates')
+         .select('*')
+         .eq('id', candidateId)
+         .single();
+
+       if (fetchError) {
+         console.error('Failed to fetch candidate from Supabase:', fetchError);
+         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+       }
+
+       if (!existingCandidate && !candidate) {
+         return res.status(404).json({ success: false, message: 'Candidate not found' });
+       }
+
+       if (existingCandidate) {
+         candidate = mapCandidateDocument(existingCandidate);
+       }
+
+       // Delete from Supabase
+       const { error: deleteError } = await supabase
+         .from('candidates')
+         .delete()
+         .eq('id', candidateId);
+
+       if (deleteError) {
+         console.error('Failed to delete candidate from Supabase:', deleteError);
+         return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+       }
+     } catch (error) {
+       console.error('Failed to delete candidate from Supabase:', error);
+       return res.status(500).json({ success: false, message: 'Failed to delete candidate' });
+     }
+    } else if (!candidate) {
+     return res.status(404).json({ success: false, message: 'Candidate not found' });
     }
 
     if (candidateIndex !== -1) {
@@ -1531,6 +1599,10 @@ app.delete('/api/candidates/:id', async (req, res) => {
     }
 
     deleteResumeFile(candidate?.resumeUrl);
+
+    if (supabase) {
+     await refreshCandidatesFromDB();
+    }
 
     res.json({ success: true, message: 'Candidate removed' });
   } catch (error) {
@@ -2160,20 +2232,21 @@ app.post('/api/talent-scout/invite', async (req, res) => {
 
     candidates[candidateIndex] = updatedCandidate;
 
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        await supabase
-          .from('candidates')
-          .update({
-            talentScoutStatus: updatedCandidate.talentScoutStatus,
-            invitedAt: updatedCandidate.invitedAt,
-            lastTalentScoutMessage: updatedCandidate.lastTalentScoutMessage || null
-          })
-          .eq('id', candidateId);
+    if (candidateCollection) {
+      try {
+        await candidateCollection.updateOne(
+          { id: candidateId },
+          {
+            $set: {
+              talentScoutStatus: updatedCandidate.talentScoutStatus,
+              invitedAt: updatedCandidate.invitedAt,
+              lastTalentScoutMessage: updatedCandidate.lastTalentScoutMessage || null
+            }
+          }
+        );
+      } catch (dbError) {
+        console.error('Failed to persist talent scout invite status:', dbError);
       }
-    } catch (dbError) {
-      console.error('Failed to persist talent scout invite status:', dbError);
     }
 
     const baseTalentScoutProfile = convertCandidateToTalentScoutProfile(updatedCandidate);
@@ -2263,15 +2336,16 @@ app.post('/api/talent-scout/upload', upload.array('resumes', 10), async (req, re
       candidates.push(candidateRecord);
       parsedProfiles.push(convertCandidateToTalentScoutProfile(candidateRecord));
 
-      try {
-        const supabase = getSupabase();
-        if (supabase) {
-          await supabase
-            .from('candidates')
-            .upsert([candidateRecord], { onConflict: 'id' });
+      if (candidateCollection) {
+        try {
+          await candidateCollection.updateOne(
+            { id: candidateRecord.id },
+            { $set: candidateRecord },
+            { upsert: true }
+          );
+        } catch (dbError) {
+          console.error('Failed to persist uploaded talent scout profile:', dbError);
         }
-      } catch (dbError) {
-        console.error('Failed to persist uploaded talent scout profile:', dbError);
       }
     }
 

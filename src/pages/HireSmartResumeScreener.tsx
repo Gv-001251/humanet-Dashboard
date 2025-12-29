@@ -1,49 +1,67 @@
 import React, { useState, useRef, DragEvent } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/common/Button';
-import { UploadCloud, FileText, CheckCircle, AlertTriangle, Sparkles, Loader2, X } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle, AlertCircle, Sparkles, Loader2, X, Plus } from 'lucide-react';
 
 interface AnalysisResult {
   matchScore: number;
   recommendation: string;
-  summary: string;
-  keyStrengths: string[];
+  foundSkills: string[];
   missingSkills: string[];
-  redFlags: string[];
 }
 
 export const HireSmartResumeScreener: React.FC = () => {
-  const [jobDescription, setJobDescription] = useState<string>('');
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const analyzeResumeMock = (): Promise<AnalysisResult> => {
+  // Mock resume skills for demonstration
+  const mockResumeSkills = ['React', 'Tailwind', 'JavaScript', 'Git', 'TypeScript', 'Node.js'];
+
+  const analyzeResumeMock = (skills: string[]): Promise<AnalysisResult> => {
     return new Promise((resolve) => {
       setTimeout(() => {
+        const foundSkills = skills.filter(skill => 
+          mockResumeSkills.some(resumeSkill => 
+            resumeSkill.toLowerCase() === skill.toLowerCase()
+          )
+        );
+        const missingSkills = skills.filter(skill => 
+          !mockResumeSkills.some(resumeSkill => 
+            resumeSkill.toLowerCase() === skill.toLowerCase()
+          )
+        );
+        
+        const matchScore = skills.length > 0 ? Math.round((foundSkills.length / skills.length) * 100) : 0;
+        
+        let recommendation = 'Not Recommended';
+        if (matchScore >= 80) recommendation = 'Strong Hire';
+        else if (matchScore >= 60) recommendation = 'Interview';
+        else if (matchScore >= 40) recommendation = 'Potential';
+
         resolve({
-          matchScore: 85,
-          recommendation: 'Interview',
-          summary: 'Candidate has strong frontend experience but lacks some specific backend knowledge required for the Senior role. Overall, demonstrates solid technical skills and leadership potential.',
-          keyStrengths: ['React.js', 'System Design', 'Team Leadership', 'TypeScript'],
-          missingSkills: ['GraphQL', 'AWS Deployment'],
-          redFlags: []
+          matchScore,
+          recommendation,
+          foundSkills,
+          missingSkills
         });
       }, 2000);
     });
   };
 
   const handleAnalyze = async () => {
-    if (!jobDescription.trim() && !file) {
-      alert('Please provide a job description or upload a resume.');
+    if (requiredSkills.length === 0 && !file) {
+      alert('Please add required skills or upload a resume.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await analyzeResumeMock();
+      const result = await analyzeResumeMock(requiredSkills);
       setAnalysisResult(result);
     } catch (error) {
       console.error('Analysis failed:', error);
@@ -96,6 +114,28 @@ export const HireSmartResumeScreener: React.FC = () => {
     }
   };
 
+  const handleAddSkill = () => {
+    const skill = skillInput.trim();
+    if (!skill) return;
+    
+    const exists = requiredSkills.some(existing => existing.toLowerCase() === skill.toLowerCase());
+    if (!exists) {
+      setRequiredSkills([...requiredSkills, skill]);
+    }
+    setSkillInput('');
+  };
+
+  const handleRemoveSkill = (skill: string) => {
+    setRequiredSkills(requiredSkills.filter(s => s !== skill));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddSkill();
+    }
+  };
+
   const getScoreColor = (score: number): string => {
     if (score < 50) return 'text-red-600';
     if (score < 75) return 'text-amber-600';
@@ -128,23 +168,54 @@ export const HireSmartResumeScreener: React.FC = () => {
       <div className="p-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">AI Resume Screener</h1>
-          <p className="text-gray-600 mt-1">Analyze candidate resumes against job descriptions using AI</p>
+          <p className="text-gray-600 mt-1">Analyze candidate resumes against required skills using AI</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Input Zone */}
           <div className="space-y-6">
-            {/* Job Description */}
+            {/* Required Skills */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Job Description
+                Required Skills
               </label>
-              <textarea
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                placeholder="Paste the job description here..."
-                className="w-full h-48 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none resize-none text-sm text-gray-700 placeholder-gray-400"
-              />
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={skillInput}
+                    onChange={(e) => setSkillInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a skill and press Enter..."
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
+                  />
+                  <Button
+                    onClick={handleAddSkill}
+                    variant="primary"
+                    className="px-4"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </Button>
+                </div>
+                {requiredSkills.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {requiredSkills.map((skill, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium border border-gray-200"
+                      >
+                        <span>{skill}</span>
+                        <button
+                          onClick={() => handleRemoveSkill(skill)}
+                          className="hover:text-gray-900 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Resume Upload */}
@@ -204,7 +275,7 @@ export const HireSmartResumeScreener: React.FC = () => {
             <Button
               onClick={handleAnalyze}
               isLoading={isLoading}
-              disabled={!jobDescription.trim() && !file}
+              disabled={requiredSkills.length === 0 && !file}
               className="w-full"
               variant="primary"
             >
@@ -229,7 +300,7 @@ export const HireSmartResumeScreener: React.FC = () => {
                   No Analysis Yet
                 </h3>
                 <p className="text-sm text-gray-500 max-w-sm">
-                  Enter a job description, upload a resume, and click "Analyze Candidate" to see AI-powered insights.
+                  Add required skills, upload a resume, and click "Analyze Candidate" to see AI-powered insights.
                 </p>
               </div>
             ) : isLoading ? (
@@ -279,49 +350,18 @@ export const HireSmartResumeScreener: React.FC = () => {
                   </div>
                 </div>
 
-                {/* AI Summary */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
-                    <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-                    AI Summary
-                  </h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {analysisResult.summary}
-                  </p>
-                </div>
-
-                {/* Key Strengths */}
-                {analysisResult.keyStrengths.length > 0 && (
+                {/* Matched Skills */}
+                {analysisResult.foundSkills.length > 0 && (
                   <div>
                     <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
                       <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                      Key Strengths
+                      Matched Skills
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {analysisResult.keyStrengths.map((strength, index) => (
+                      {analysisResult.foundSkills.map((skill, index) => (
                         <span
                           key={index}
                           className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium border border-green-200"
-                        >
-                          {strength}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Missing Skills */}
-                {analysisResult.missingSkills.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                      <AlertTriangle className="w-4 h-4 mr-2 text-amber-600" />
-                      Missing Skills
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {analysisResult.missingSkills.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium border border-amber-200"
                         >
                           {skill}
                         </span>
@@ -330,32 +370,31 @@ export const HireSmartResumeScreener: React.FC = () => {
                   </div>
                 )}
 
-                {/* Red Flags */}
-                {analysisResult.redFlags.length > 0 && (
+                {/* Missing Requirements */}
+                {analysisResult.missingSkills.length > 0 && (
                   <div>
                     <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                      <AlertTriangle className="w-4 h-4 mr-2 text-red-600" />
-                      Red Flags
+                      <AlertCircle className="w-4 h-4 mr-2 text-red-600" />
+                      Missing Requirements
                     </h4>
-                    <div className="space-y-2">
-                      {analysisResult.redFlags.map((flag, index) => (
-                        <div
+                    <div className="flex flex-wrap gap-2">
+                      {analysisResult.missingSkills.map((skill, index) => (
+                        <span
                           key={index}
-                          className="flex items-start space-x-2 p-3 bg-red-50 rounded-lg border border-red-200"
+                          className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium border border-red-200"
                         >
-                          <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-red-700">{flag}</span>
-                        </div>
+                          {skill}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* No Red Flags Message */}
-                {analysisResult.redFlags.length === 0 && (
+                {/* All Skills Matched */}
+                {analysisResult.missingSkills.length === 0 && analysisResult.foundSkills.length > 0 && (
                   <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg border border-green-200">
                     <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-700">No red flags detected</span>
+                    <span className="text-sm text-green-700">All required skills matched!</span>
                   </div>
                 )}
               </div>
