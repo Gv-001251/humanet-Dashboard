@@ -7,7 +7,7 @@ const fs = require('fs');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+const { getSupabase, initSupabase } = require('./src/config/supabase');
 const {
   predictSalary,
   getMarketComparison,
@@ -40,19 +40,6 @@ ensureUploadsDirExists();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.warn('Supabase credentials not found. Using in-memory storage for development.');
-}
-
-const supabase = supabaseUrl && supabaseServiceRoleKey 
-  ? createClient(supabaseUrl, supabaseServiceRoleKey)
-  : null;
 
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -175,8 +162,9 @@ const refreshCandidatesFromDB = async () => {
 
 const initializeDatabase = async () => {
   try {
+    const supabase = getSupabase();
     if (!supabase) {
-      console.log('Using in-memory storage for development (no Supabase connection)');
+      console.log('⚠️  Supabase not connected. Using in-memory storage for candidates.');
       return;
     }
 
@@ -217,7 +205,7 @@ const initializeDatabase = async () => {
       }
     }
 
-    console.log(`Database initialized with ${candidates.length} candidate records.`);
+    console.log(`✅ Database initialized with ${candidates.length} candidate records.`);
   } catch (error) {
     console.error('Failed to initialize database:', error);
   }
@@ -2450,6 +2438,9 @@ app.post('/api/salary/check-fit', (req, res) => {
     });
   }
 });
+
+// Initialize Supabase
+initSupabase();
 
 app.listen(PORT, () => {
   console.log(`HumaNet backend listening on port ${PORT}`);
